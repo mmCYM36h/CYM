@@ -1,0 +1,1701 @@
+-- [[ RC2 Elite Controller V20 - 无圆形版 + 猎鹰矛M2 + 四列按钮 ]]
+
+
+local DEBUG_MODE = true
+local function debugPrint(...) if DEBUG_MODE then print("[Elite Debug]", ...) end end
+debugPrint("脚本开始加载...")
+
+
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+local SoundService = game:GetService("SoundService")
+local Lighting = game:GetService("Lighting")
+
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+
+local state = { savedPosition = nil, saveCount = 0 }
+local savedHealPosition = nil
+local returnTaskId = 0
+
+
+local function InstantTeleport(targetPos)
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    hrp.Anchored = true
+    local finalPos = targetPos + Vector3.new(0, 3, 0)
+    hrp.CFrame = CFrame.new(finalPos)
+    task.wait(0.1)
+    hrp.Anchored = false
+    hrp.AssemblyLinearVelocity = Vector3.zero
+    hrp.AssemblyAngularVelocity = Vector3.zero
+    for i = 1, 5 do
+        task.wait(0.05)
+        if (hrp.Position - finalPos).Magnitude > 10 then
+            hrp.CFrame = CFrame.new(finalPos)
+            hrp.AssemblyLinearVelocity = Vector3.zero
+        end
+    end
+end
+local function DoTeleport(p) InstantTeleport(p) end
+
+
+local EliteUI = {}
+EliteUI.Theme = {
+    Background=Color3.fromRGB(25,25,35), Header=Color3.fromRGB(35,35,50),
+    Button=Color3.fromRGB(45,45,65), ButtonHover=Color3.fromRGB(60,60,85),
+    ButtonActive=Color3.fromRGB(80,140,220), Text=Color3.fromRGB(255,255,255),
+    TextDim=Color3.fromRGB(180,180,180), Accent=Color3.fromRGB(100,180,255),
+    Success=Color3.fromRGB(80,200,120), Danger=Color3.fromRGB(220,80,80),
+    IceColor=Color3.fromRGB(0,255,255), RapierColor=Color3.fromRGB(160,82,45),
+    HammerColor=Color3.fromRGB(139,69,19), SpearColor=Color3.fromRGB(255,215,0),
+    FanColor=Color3.fromRGB(255,105,180), SickleColor=Color3.fromRGB(138,43,226),
+    OnionColor=Color3.fromRGB(255,215,0), DiamondColor=Color3.fromRGB(192,192,192),
+    SpellColor=Color3.fromRGB(186,85,211), KrampusColor=Color3.fromRGB(255,69,0),
+    MahoragaColor=Color3.fromRGB(0,191,255), ExplosiveSpearColor=Color3.fromRGB(255,140,0),
+    DrillColor=Color3.fromRGB(255,20,147), FalconColor=Color3.fromRGB(0,200,150),
+}
+
+
+function EliteUI:Create()
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "EliteControllerUI"
+    gui.ResetOnSpawn = false
+    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    gui.Enabled = true
+    local ok = pcall(function() gui.Parent = CoreGui end)
+    if not ok then gui.Parent = PlayerGui end
+
+
+    local Main = Instance.new("Frame", gui)
+    Main.Size = UDim2.new(0,320,0,420)
+    Main.Position = UDim2.new(0.5,-160,0.5,-210)
+    Main.BackgroundColor3 = self.Theme.Background
+    Main.BorderSizePixel = 0
+    Main.Active = true
+    Main.Draggable = true
+    Instance.new("UICorner", Main).CornerRadius = UDim.new(0,10)
+
+
+    local Shadow = Instance.new("ImageLabel", Main)
+    Shadow.Size = UDim2.new(1,30,1,30)
+    Shadow.Position = UDim2.new(0,-15,0,-15)
+    Shadow.BackgroundTransparency = 1
+    Shadow.Image = "rbxassetid://5554236805"
+    Shadow.ImageColor3 = Color3.new(0,0,0)
+    Shadow.ImageTransparency = 0.5
+    Shadow.ScaleType = Enum.ScaleType.Slice
+    Shadow.SliceCenter = Rect.new(23,23,277,277)
+    Shadow.ZIndex = -1
+
+
+    local Header = Instance.new("Frame", Main)
+    Header.Size = UDim2.new(1,0,0,40)
+    Header.BackgroundColor3 = self.Theme.Header
+    Header.BorderSizePixel = 0
+    Instance.new("UICorner", Header).CornerRadius = UDim.new(0,10)
+
+
+    local Title = Instance.new("TextLabel", Header)
+    Title.Size = UDim2.new(1,-80,1,0)
+    Title.Position = UDim2.new(0,15,0,0)
+    Title.BackgroundTransparency = 1
+    Title.Text = "决斗勇士"
+    Title.TextColor3 = self.Theme.Text
+    Title.Font = Enum.Font.GothamBold
+    Title.TextSize = 16
+    Title.TextXAlignment = Enum.TextXAlignment.Left
+
+
+    local MinBtn = Instance.new("TextButton", Header)
+    MinBtn.Size = UDim2.new(0,30,0,30)
+    MinBtn.Position = UDim2.new(1,-70,0,5)
+    MinBtn.BackgroundColor3 = Color3.fromRGB(255,180,50)
+    MinBtn.Text = "-"
+    MinBtn.TextColor3 = Color3.new(0,0,0)
+    MinBtn.Font = Enum.Font.GothamBold
+    MinBtn.TextSize = 20
+    Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(0,6)
+
+
+    local CloseBtn = Instance.new("TextButton", Header)
+    CloseBtn.Size = UDim2.new(0,30,0,30)
+    CloseBtn.Position = UDim2.new(1,-35,0,5)
+    CloseBtn.BackgroundColor3 = self.Theme.Danger
+    CloseBtn.Text = "×"
+    CloseBtn.TextColor3 = Color3.new(1,1,1)
+    CloseBtn.Font = Enum.Font.GothamBold
+    CloseBtn.TextSize = 20
+    Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0,6)
+
+
+    local TabBar = Instance.new("Frame", Main)
+    TabBar.Size = UDim2.new(1,-20,0,35)
+    TabBar.Position = UDim2.new(0,10,0,45)
+    TabBar.BackgroundTransparency = 1
+    local TL = Instance.new("UIListLayout", TabBar)
+    TL.FillDirection = Enum.FillDirection.Horizontal
+    TL.Padding = UDim.new(0,5)
+
+
+    local Content = Instance.new("ScrollingFrame", Main)
+    Content.Size = UDim2.new(1,-20,1,-95)
+    Content.Position = UDim2.new(0,10,0,85)
+    Content.BackgroundTransparency = 1
+    Content.BorderSizePixel = 0
+    Content.ScrollBarThickness = 4
+    Content.ScrollBarImageColor3 = self.Theme.Accent
+    Content.CanvasSize = UDim2.new(0,0,0,0)
+    Content.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    local CL = Instance.new("UIListLayout", Content)
+    CL.Padding = UDim.new(0,8)
+
+
+    self.Gui, self.Main, self.TabBar, self.Content = gui, Main, TabBar, Content
+    self.Tabs = {}
+    self.CurrentTab = nil
+
+
+    local testLabel = Instance.new("TextLabel", Main)
+    testLabel.Size = UDim2.new(1,0,0,30)
+    testLabel.Position = UDim2.new(0,0,1,-30)
+    testLabel.BackgroundColor3 = Color3.new(1,0,0)
+    testLabel.Text = "UI 已加载，2秒后消失"
+    testLabel.TextColor3 = Color3.new(1,1,1)
+    testLabel.Font = Enum.Font.GothamBold
+    testLabel.TextSize = 14
+    task.delay(2, function() testLabel:Destroy() end)
+
+
+    local min = false
+    MinBtn.MouseButton1Click:Connect(function()
+        min = not min
+        if min then Main.Size = UDim2.new(0,320,0,40); Content.Visible=false; TabBar.Visible=false
+        else Main.Size = UDim2.new(0,320,0,420); Content.Visible=true; TabBar.Visible=true end
+    end)
+    CloseBtn.MouseButton1Click:Connect(function() gui.Enabled = false end)
+    UserInputService.InputBegan:Connect(function(input, gpe)
+        if gpe then return end
+        if input.KeyCode == Enum.KeyCode.RightControl then gui.Enabled = not gui.Enabled end
+    end)
+    return self
+end
+
+
+function EliteUI:CreateTab(name)
+    local btn = Instance.new("TextButton", self.TabBar)
+    btn.Size = UDim2.new(0,55,1,0)
+    btn.BackgroundColor3 = self.Theme.Button
+    btn.Text = name
+    btn.TextColor3 = self.Theme.TextDim
+    btn.Font = Enum.Font.GothamSemibold
+    btn.TextSize = 11
+    btn.AutoButtonColor = false
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0,6)
+
+
+    local content = Instance.new("Frame")
+    content.Size = UDim2.new(1,0,0,0)
+    content.BackgroundTransparency = 1
+    content.AutomaticSize = Enum.AutomaticSize.Y
+    content.Visible = false
+    content.Parent = self.Content
+    local l = Instance.new("UIListLayout", content)
+    l.Padding = UDim.new(0,6)
+
+
+    self.Tabs[name] = { Button = btn, Content = content }
+    btn.MouseButton1Click:Connect(function() self:SwitchTab(name) end)
+    if not self.CurrentTab then self:SwitchTab(name) end
+    return content
+end
+
+
+function EliteUI:SwitchTab(name)
+    for tn, tab in pairs(self.Tabs) do
+        if tn == name then
+            tab.Button.BackgroundColor3 = self.Theme.ButtonActive
+            tab.Button.TextColor3 = self.Theme.Text
+            tab.Content.Visible = true
+            self.CurrentTab = name
+        else
+            tab.Button.BackgroundColor3 = self.Theme.Button
+            tab.Button.TextColor3 = self.Theme.TextDim
+            tab.Content.Visible = false
+        end
+    end
+end
+
+
+function EliteUI:CreateButton(parent, text, callback)
+    local b = Instance.new("TextButton", parent)
+    b.Size = UDim2.new(1,0,0,32)
+    b.BackgroundColor3 = self.Theme.Button
+    b.Text = text
+    b.TextColor3 = self.Theme.Text
+    b.Font = Enum.Font.GothamSemibold
+    b.TextSize = 13
+    b.AutoButtonColor = false
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0,6)
+    b.MouseEnter:Connect(function() TweenService:Create(b,TweenInfo.new(0.15),{BackgroundColor3=self.Theme.ButtonHover}):Play() end)
+    b.MouseLeave:Connect(function() TweenService:Create(b,TweenInfo.new(0.15),{BackgroundColor3=self.Theme.Button}):Play() end)
+    b.MouseButton1Click:Connect(callback)
+    return b
+end
+
+
+function EliteUI:CreateToggle(parent, text, default, callback, textSize)
+    local f = Instance.new("Frame", parent)
+    f.Size = UDim2.new(1,0,0,32)
+    f.BackgroundColor3 = self.Theme.Button
+    Instance.new("UICorner", f).CornerRadius = UDim.new(0,6)
+    local lb = Instance.new("TextLabel", f)
+    lb.Size = UDim2.new(1,-60,1,0)
+    lb.Position = UDim2.new(0,10,0,0)
+    lb.BackgroundTransparency = 1
+    lb.Text = text
+    lb.TextColor3 = self.Theme.Text
+    lb.Font = Enum.Font.GothamSemibold
+    lb.TextSize = textSize or 13
+    lb.TextXAlignment = Enum.TextXAlignment.Left
+    local bg = Instance.new("Frame", f)
+    bg.Size = UDim2.new(0,44,0,22)
+    bg.Position = UDim2.new(1,-54,0.5,-11)
+    bg.BackgroundColor3 = Color3.fromRGB(60,60,60)
+    Instance.new("UICorner", bg).CornerRadius = UDim.new(0,4)  -- 方角
+    local c = Instance.new("Frame", bg)
+    c.Size = UDim2.new(0,18,0,18)
+    c.Position = UDim2.new(0,2,0.5,-9)
+    c.BackgroundColor3 = Color3.new(1,1,1)
+    Instance.new("UICorner", c).CornerRadius = UDim.new(0,3)  -- 方角
+    local enabled = default or false
+    local function upd()
+        if enabled then
+            TweenService:Create(bg,TweenInfo.new(0.2),{BackgroundColor3=self.Theme.Success}):Play()
+            TweenService:Create(c,TweenInfo.new(0.2),{Position=UDim2.new(1,-20,0.5,-9)}):Play()
+        else
+            TweenService:Create(bg,TweenInfo.new(0.2),{BackgroundColor3=Color3.fromRGB(60,60,60)}):Play()
+            TweenService:Create(c,TweenInfo.new(0.2),{Position=UDim2.new(0,2,0.5,-9)}):Play()
+        end
+    end
+    upd()
+    local ca = Instance.new("TextButton", f)
+    ca.Size = UDim2.new(1,0,1,0)
+    ca.BackgroundTransparency = 1
+    ca.Text = ""
+    ca.MouseButton1Click:Connect(function()
+        enabled = not enabled
+        upd()
+        callback(enabled)
+    end)
+    return { Set = function(_,v) enabled=v; upd() end, Get = function() return enabled end }
+end
+
+
+function EliteUI:CreateLabel(parent, text)
+    local l = Instance.new("TextLabel", parent)
+    l.Size = UDim2.new(1,0,0,28)
+    l.BackgroundColor3 = self.Theme.Header
+    l.Text = "  "..text
+    l.TextColor3 = self.Theme.Accent
+    l.Font = Enum.Font.GothamBold
+    l.TextSize = 13
+    l.TextXAlignment = Enum.TextXAlignment.Left
+    Instance.new("UICorner", l).CornerRadius = UDim.new(0,6)
+    return { Set = function(_,t) l.Text = "  "..t end }
+end
+
+
+function EliteUI:CreateDivider(parent)
+    local d = Instance.new("Frame", parent)
+    d.Size = UDim2.new(1,0,0,1)
+    d.BackgroundColor3 = self.Theme.Button
+    d.BorderSizePixel = 0
+end
+
+
+function EliteUI:CreateCategory(parent, title)
+    local cat = Instance.new("Frame", parent)
+    cat.Size = UDim2.new(1,0,0,0)
+    cat.BackgroundTransparency = 1
+    cat.AutomaticSize = Enum.AutomaticSize.Y
+    local tb = Instance.new("TextButton", cat)
+    tb.Name = "Title"
+    tb.Size = UDim2.new(1,0,0,32)
+    tb.BackgroundColor3 = self.Theme.Header
+    tb.Text = "  "..title.."  ▼"
+    tb.TextColor3 = self.Theme.Text
+    tb.Font = Enum.Font.GothamBold
+    tb.TextSize = 14
+    tb.TextXAlignment = Enum.TextXAlignment.Left
+    Instance.new("UICorner", tb).CornerRadius = UDim.new(0,6)
+    local cont = Instance.new("Frame", cat)
+    cont.Name = "Container"
+    cont.Size = UDim2.new(1,0,0,0)
+    cont.Position = UDim2.new(0,0,0,32)
+    cont.BackgroundTransparency = 1
+    cont.AutomaticSize = Enum.AutomaticSize.Y
+    cont.Visible = false
+    local l = Instance.new("UIListLayout", cont)
+    l.Padding = UDim.new(0,4)
+    local ex = false
+    tb.MouseButton1Click:Connect(function()
+        ex = not ex
+        cont.Visible = ex
+        tb.Text = "  "..title..(ex and "  ▲" or "  ▼")
+    end)
+    return cont
+end
+
+
+function EliteUI:Notify(title, msg, dur)
+    dur = dur or 3
+    local n = Instance.new("Frame", self.Gui)
+    n.Size = UDim2.new(0,250,0,60)
+    n.Position = UDim2.new(1,10,1,-70)
+    n.BackgroundColor3 = self.Theme.Header
+    n.BorderSizePixel = 0
+    Instance.new("UICorner", n).CornerRadius = UDim.new(0,8)
+    local ab = Instance.new("Frame", n)
+    ab.Size = UDim2.new(0,4,1,-10)
+    ab.Position = UDim2.new(0,5,0,5)
+    ab.BackgroundColor3 = self.Theme.Accent
+    Instance.new("UICorner", ab).CornerRadius = UDim.new(0,2)
+    local tl = Instance.new("TextLabel", n)
+    tl.Size = UDim2.new(1,-20,0,25)
+    tl.Position = UDim2.new(0,15,0,5)
+    tl.BackgroundTransparency = 1
+    tl.Text = title
+    tl.TextColor3 = self.Theme.Accent
+    tl.Font = Enum.Font.GothamBold
+    tl.TextSize = 14
+    tl.TextXAlignment = Enum.TextXAlignment.Left
+    local ml = Instance.new("TextLabel", n)
+    ml.Size = UDim2.new(1,-20,0,25)
+    ml.Position = UDim2.new(0,15,0,30)
+    ml.BackgroundTransparency = 1
+    ml.Text = msg
+    ml.TextColor3 = self.Theme.TextDim
+    ml.Font = Enum.Font.Gotham
+    ml.TextSize = 12
+    ml.TextXAlignment = Enum.TextXAlignment.Left
+    TweenService:Create(n,TweenInfo.new(0.3,Enum.EasingStyle.Back),{Position=UDim2.new(1,-260,1,-70)}):Play()
+    task.delay(dur, function()
+        TweenService:Create(n,TweenInfo.new(0.3),{Position=UDim2.new(1,10,1,-70)}):Play()
+        task.wait(0.3)
+        n:Destroy()
+    end)
+end
+
+
+local UI = EliteUI:Create()
+
+
+-- ============ 传送选项卡 ============
+local TeleTab = UI:CreateTab("传送")
+
+
+UI:CreateButton(TeleTab, "临时保存/传送", function()
+    if not LocalPlayer.Character then UI:Notify("错误","角色不存在",2) return end
+    local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then UI:Notify("错误","找不到HumanoidRootPart",2) return end
+    state.saveCount = (state.saveCount or 0) + 1
+    if state.saveCount % 2 == 1 then
+        state.savedPosition = hrp.Position
+        UI:Notify("位置已保存", string.format("X:%.1f, Y:%.1f, Z:%.1f", state.savedPosition.X, state.savedPosition.Y, state.savedPosition.Z), 3)
+    else
+        if state.savedPosition then
+            DoTeleport(state.savedPosition)
+            UI:Notify("传送成功","已传送到保存的位置",3)
+            state.savedPosition = nil
+        else UI:Notify("错误","没有保存的位置",2) end
+    end
+end)
+
+
+UI:CreateButton(TeleTab, "大厅", function()
+    DoTeleport(Vector3.new(250,-82,-1865))
+    UI:Notify("传送","前往大厅",2)
+end)
+
+
+UI:CreateDivider(TeleTab)
+
+
+UI:CreateButton(TeleTab, "回满血", function()
+    if not LocalPlayer.Character then UI:Notify("错误","角色不存在",2) return end
+    local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then UI:Notify("错误","找不到HumanoidRootPart",2) return end
+    savedHealPosition = hrp.Position
+    task.spawn(function()
+        local ep = workspace:WaitForChild("Event"):WaitForChild("DuelGame_RemoteEvent")
+        pcall(function() ep:FireServer({Data={Type="Training"},TYPE="Teleport"}) end)
+        task.wait(0.33)
+        pcall(function() ep:FireServer({Data={Type="1v1"},TYPE="Teleport"}) end)
+        task.wait(0.33)
+        pcall(function() ep:FireServer({Data={Type="Training"},TYPE="Teleport"}) end)
+        task.wait(0.33)
+        DoTeleport(savedHealPosition)
+        UI:Notify("回血","完成",2)
+    end)
+end)
+
+
+UI:CreateButton(TeleTab, "自动加入天空竞技场", function()
+    local ok, err = pcall(function()
+        game:GetService("ReplicatedStorage"):WaitForChild("ByteNet"):WaitForChild("system"):WaitForChild("ByteNetQuery"):InvokeServer(buffer.fromstring("\r\005\003\203fo."), 13)
+    end)
+    if ok then UI:Notify("自动加入","执行成功",2) else UI:Notify("自动加入","执行失败: "..tostring(err),3) end
+end)
+
+
+UI:CreateDivider(TeleTab)
+
+
+local main1v1 = UI:CreateCategory(TeleTab, "1v1竞技场")
+local mt = main1v1:FindFirstChild("Title")
+if mt then mt.BackgroundColor3 = Color3.fromRGB(128,0,128); mt.TextColor3 = Color3.new(1,1,1) end
+
+
+local subSky = UI:CreateCategory(main1v1, "1v1决斗场上空")
+for _, d in ipairs({
+    {"1号决斗场", Vector3.new(-83,65,-1400)},
+    {"2号决斗场", Vector3.new(-86,65,-1750)},
+    {"3号决斗场", Vector3.new(-85,65,-2100)},
+    {"4号决斗场", Vector3.new(590,65,-1400)},
+    {"5号决斗场", Vector3.new(590,65,-1750)},
+    {"6号决斗场", Vector3.new(590,65,-2100)},
+    {"天空决斗场", Vector3.new(260,285,-2700)},
+}) do UI:CreateButton(subSky, d[1], function() DoTeleport(d[2]) end) end
+
+
+local subBlue = UI:CreateCategory(main1v1, "1v1蓝色")
+for _, d in ipairs({
+    {"1号", Vector3.new(-125,-101,-1440)},{"2号", Vector3.new(-125,-100,-1790)},
+    {"3号", Vector3.new(-125,-100,-2141)},{"4号", Vector3.new(552,-100,-1439)},
+    {"5号", Vector3.new(552,-100,-1790)},{"6号", Vector3.new(552,-100,-2140)},
+}) do UI:CreateButton(subBlue, d[1], function() DoTeleport(d[2]) end) end
+
+
+local subRed = UI:CreateCategory(main1v1, "1v1红色")
+for _, d in ipairs({
+    {"1号", Vector3.new(-44,-100,-1359)},{"2号", Vector3.new(-44,-100,-1709)},
+    {"3号", Vector3.new(-44,-100,-2059)},{"4号", Vector3.new(634,-100,-1358)},
+    {"5号", Vector3.new(634,-100,-1709)},{"6号", Vector3.new(634,-101,-2059)},
+}) do UI:CreateButton(subRed, d[1], function() DoTeleport(d[2]) end) end
+
+
+local catMulti = UI:CreateCategory(TeleTab, "多人竞技场上空")
+local mt2 = catMulti:FindFirstChild("Title")
+if mt2 then mt2.BackgroundColor3 = Color3.fromRGB(255,165,0); mt2.TextColor3 = Color3.new(1,1,1) end
+for _, d in ipairs({
+    {"2v2 1号", Vector3.new(-80,65,-2450)},
+    {"2v2 2号", Vector3.new(590,65,-2450)},
+    {"3v3", Vector3.new(-425,65,-2165)},
+}) do UI:CreateButton(catMulti, d[1], function() DoTeleport(d[2]) end) end
+
+
+local chaosCat = UI:CreateCategory(TeleTab, "混沌模式")
+local ct = chaosCat:FindFirstChild("Title")
+if ct then ct.BackgroundColor3 = Color3.fromRGB(255,255,255); ct.TextColor3 = Color3.fromRGB(0,0,0) end
+UI:CreateButton(chaosCat, "出生点", function() DoTeleport(Vector3.new(-13692,167,6841)) end)
+UI:CreateButton(chaosCat, "换技能", function() DoTeleport(Vector3.new(-13695,167,6779)) end)
+
+
+local passiveCat = UI:CreateCategory(TeleTab, "(我不是主动的😭)")
+local returnToggle = UI:CreateToggle(passiveCat, "传送回原位", false, function() end)
+
+
+local currentTempButton = nil
+local function createTempTeleportButton(locationName, locationPos)
+    if currentTempButton and currentTempButton.Parent then currentTempButton:Destroy(); currentTempButton = nil end
+    local tb = Instance.new("TextButton", UI.Gui)
+    tb.Size = UDim2.new(0,150,0,40)
+    tb.Position = UDim2.new(0.5,170,0.5,-20)
+    tb.BackgroundColor3 = UI.Theme.Success
+    tb.Text = "传送至 "..locationName
+    tb.TextColor3 = Color3.new(1,1,1)
+    tb.Font = Enum.Font.GothamBold
+    tb.TextSize = 14
+    tb.ZIndex = 10
+    Instance.new("UICorner", tb).CornerRadius = UDim.new(0,8)
+    tb.MouseButton1Click:Connect(function()
+        if returnToggle:Get() then
+            local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if not hrp then UI:Notify("错误","角色不存在",2); tb:Destroy(); currentTempButton=nil; return end
+            local orig = hrp.Position
+            local tid = returnTaskId + 1
+            returnTaskId = tid
+            DoTeleport(locationPos)
+            UI:Notify("传送","前往 "..locationName.."，0.5秒后返回",2)
+            task.spawn(function()
+                task.wait(0.5)
+                if returnTaskId == tid then DoTeleport(orig); UI:Notify("回传","已返回原位",2) end
+            end)
+        else
+            DoTeleport(locationPos)
+            UI:Notify("传送","前往 "..locationName,2)
+        end
+        tb:Destroy()
+        currentTempButton = nil
+    end)
+    tb.Active = true
+    tb.Draggable = true
+    currentTempButton = tb
+end
+
+
+for _, d in ipairs({
+    {"bro去打足球", Vector3.new(220,-82,-1968)},
+    {"bro去打混沌", Vector3.new(221,-81,-1998)},
+    {"bro去火山旅游", Vector3.new(221,-82,-2028)},
+    {"bro去打PVE", Vector3.new(250,-78,-2050)},
+    {"bro去挂机", Vector3.new(331,-81,-1860)},
+    {"bro去猛攻排位", Vector3.new(252,-76,-1726)},
+}) do UI:CreateButton(passiveCat, d[1], function() createTempTeleportButton(d[1], d[2]) end) end
+
+
+-- ============ 辅助选项卡 ============
+local AssistTab = UI:CreateTab("辅助")
+
+
+local boxFolder, boxFolder2, boxFolderSickle, boxHelper
+local vertexParts, vertexParts2, vertexPartsSickle, helperParts = {},{},{},{}
+local offsets, offsets2, offsetsSickle, offsetsHelper = {},{},{},{}
+local updateConnection, updateConnection2, updateConnectionSickle, updateConnectionHelper
+local inputBoxes = {}
+local dualEnabled = false
+local playerVisuals = {}
+
+
+local pointColors = {
+    Color3.fromRGB(255,59,48), Color3.fromRGB(52,199,89), Color3.fromRGB(0,122,255), Color3.fromRGB(255,204,0),
+    Color3.fromRGB(175,82,222), Color3.fromRGB(255,149,0), Color3.fromRGB(90,200,250), Color3.fromRGB(255,45,85),
+}
+local edges = {
+    {1,2},{2,3},{3,4},{4,1},{5,6},{6,7},{7,8},{8,5},{1,5},{2,6},{3,7},{4,8},
+}
+
+
+local function clearSelfVisuals()
+    if boxFolder then boxFolder:Destroy(); boxFolder=nil end
+    vertexParts = {}
+    if updateConnection then updateConnection:Disconnect(); updateConnection=nil end
+end
+local function clearDualVisuals()
+    if boxFolder2 then boxFolder2:Destroy(); boxFolder2=nil end
+    vertexParts2 = {}
+    if updateConnection2 then updateConnection2:Disconnect(); updateConnection2=nil end
+end
+local function clearSickleVisuals()
+    if boxFolderSickle then boxFolderSickle:Destroy(); boxFolderSickle=nil end
+    vertexPartsSickle = {}
+    if updateConnectionSickle then updateConnectionSickle:Disconnect(); updateConnectionSickle=nil end
+end
+local function clearHelperVisuals()
+    if boxHelper then boxHelper:Destroy(); boxHelper=nil end
+    helperParts = {}
+    if updateConnectionHelper then updateConnectionHelper:Disconnect(); updateConnectionHelper=nil end
+end
+
+
+local function buildSelfVisuals()
+    clearSelfVisuals()
+    boxFolder = Instance.new("Folder", workspace)
+    boxFolder.Name = "BoxVisuals"
+    for i=1,8 do
+        local b = Instance.new("Part")
+        b.Shape = Enum.PartType.Block
+        b.Size = Vector3.new(0.6,0.6,0.6)
+        b.BrickColor = BrickColor.new(pointColors[i])
+        b.Material = Enum.Material.SmoothPlastic
+        b.Anchored = true
+        b.CanCollide = false
+        b.Parent = boxFolder
+        local a = Instance.new("Attachment", b)
+        a.Name = "BeamAttach"
+        vertexParts[i] = b
+    end
+    for _, e in ipairs(edges) do
+        local beam = Instance.new("Beam", boxFolder)
+        beam.Attachment0 = vertexParts[e[1]]:FindFirstChild("BeamAttach")
+        beam.Attachment1 = vertexParts[e[2]]:FindFirstChild("BeamAttach")
+        beam.Width0 = 0.12
+        beam.Width1 = 0.12
+        beam.Color = ColorSequence.new(Color3.fromRGB(255,0,0))
+        beam.Segments = 1
+        beam.Enabled = true
+        beam.Parent = boxFolder
+    end
+end
+
+
+local function buildDualVisuals()
+    clearDualVisuals()
+    boxFolder2 = Instance.new("Folder", workspace)
+    boxFolder2.Name = "BoxVisuals2"
+    for i=1,8 do
+        local b = Instance.new("Part")
+        b.Shape = Enum.PartType.Block
+        b.Size = Vector3.new(0.6,0.6,0.6)
+        b.BrickColor = BrickColor.new(Color3.fromRGB(0,255,255))
+        b.Material = Enum.Material.SmoothPlastic
+        b.Anchored = true
+        b.CanCollide = false
+        b.Parent = boxFolder2
+        local a = Instance.new("Attachment", b)
+        a.Name = "BeamAttach"
+        vertexParts2[i] = b
+    end
+    for _, e in ipairs(edges) do
+        local beam = Instance.new("Beam", boxFolder2)
+        beam.Attachment0 = vertexParts2[e[1]]:FindFirstChild("BeamAttach")
+        beam.Attachment1 = vertexParts2[e[2]]:FindFirstChild("BeamAttach")
+        beam.Width0 = 0.12
+        beam.Width1 = 0.12
+        beam.Color = ColorSequence.new(Color3.fromRGB(0,255,255))
+        beam.Segments = 1
+        beam.Enabled = true
+        beam.Parent = boxFolder2
+    end
+end
+
+
+local function buildSickleVisuals()
+    clearSickleVisuals()
+    boxFolderSickle = Instance.new("Folder", workspace)
+    boxFolderSickle.Name = "BoxVisualsSickle"
+    for i=1,8 do
+        local b = Instance.new("Part")
+        b.Shape = Enum.PartType.Block
+        b.Size = Vector3.new(0.6,0.6,0.6)
+        b.BrickColor = BrickColor.new(Color3.fromRGB(0,255,0))
+        b.Material = Enum.Material.SmoothPlastic
+        b.Anchored = true
+        b.CanCollide = false
+        b.Parent = boxFolderSickle
+        local a = Instance.new("Attachment", b)
+        a.Name = "BeamAttach"
+        vertexPartsSickle[i] = b
+    end
+    for _, e in ipairs(edges) do
+        local beam = Instance.new("Beam", boxFolderSickle)
+        beam.Attachment0 = vertexPartsSickle[e[1]]:FindFirstChild("BeamAttach")
+        beam.Attachment1 = vertexPartsSickle[e[2]]:FindFirstChild("BeamAttach")
+        beam.Width0 = 0.12
+        beam.Width1 = 0.12
+        beam.Color = ColorSequence.new(Color3.fromRGB(0,255,0))
+        beam.Segments = 1
+        beam.Enabled = true
+        beam.Parent = boxFolderSickle
+    end
+end
+
+
+local function buildHelperVisuals()
+    clearHelperVisuals()
+    boxHelper = Instance.new("Folder", workspace)
+    boxHelper.Name = "SickleHelper"
+    for i=1,8 do
+        local b = Instance.new("Part")
+        b.Shape = Enum.PartType.Block
+        b.Size = Vector3.new(0.6,0.6,0.6)
+        b.BrickColor = BrickColor.new(Color3.fromRGB(100,149,237))
+        b.Material = Enum.Material.SmoothPlastic
+        b.Anchored = true
+        b.CanCollide = false
+        b.Parent = boxHelper
+        local a = Instance.new("Attachment", b)
+        a.Name = "BeamAttach"
+        helperParts[i] = b
+    end
+    for _, e in ipairs(edges) do
+        local beam = Instance.new("Beam", boxHelper)
+        beam.Attachment0 = helperParts[e[1]]:FindFirstChild("BeamAttach")
+        beam.Attachment1 = helperParts[e[2]]:FindFirstChild("BeamAttach")
+        beam.Width0 = 0.12
+        beam.Width1 = 0.12
+        beam.Color = ColorSequence.new(Color3.fromRGB(100,149,237))
+        beam.Segments = 1
+        beam.Enabled = true
+        beam.Parent = boxHelper
+    end
+end
+
+
+function updateSelfPositions()
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp or not boxFolder then return end
+    local cf = hrp.CFrame
+    local r, u, l = cf.RightVector, cf.UpVector, cf.LookVector
+    for i=1,8 do
+        local o = offsets[i] or Vector3.zero
+        vertexParts[i].Position = hrp.Position + (o.X*r) + (o.Y*u) + (o.Z*l)
+    end
+end
+
+
+local function updateDualPositions()
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp or not boxFolder2 then return end
+    local cf = hrp.CFrame
+    local r, u, l = cf.RightVector, cf.UpVector, cf.LookVector
+    for i=1,8 do
+        local o = offsets2[i] or Vector3.zero
+        vertexParts2[i].Position = hrp.Position + (o.X*r) + (o.Y*u) + (o.Z*l)
+    end
+end
+
+
+local function updateSicklePositions()
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp or not boxFolderSickle then return end
+    local cf = hrp.CFrame
+    local r, u, l = cf.RightVector, cf.UpVector, cf.LookVector
+    for i=1,8 do
+        local o = offsetsSickle[i] or Vector3.zero
+        vertexPartsSickle[i].Position = hrp.Position + (o.X*r) + (o.Y*u) + (o.Z*l)
+    end
+end
+
+
+local function updateHelperPositions()
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp or not boxHelper then return end
+    local cf = hrp.CFrame
+    local r, u, l = cf.RightVector, cf.UpVector, cf.LookVector
+    for i=1,8 do
+        local o = offsetsHelper[i] or Vector3.zero
+        helperParts[i].Position = hrp.Position + (o.X*r) + (o.Y*u) + (o.Z*l)
+    end
+end
+
+
+local function createPlayerVisual(player)
+    if playerVisuals[player] then
+        playerVisuals[player].folder:Destroy()
+        if playerVisuals[player].connection then playerVisuals[player].connection:Disconnect() end
+        playerVisuals[player] = nil
+    end
+    local folder = Instance.new("Folder", workspace)
+    folder.Name = "BoxVisuals_"..player.Name
+    local parts = {}
+    for i=1,8 do
+        local b = Instance.new("Part")
+        b.Shape = Enum.PartType.Block
+        b.Size = Vector3.new(0.6,0.6,0.6)
+        b.BrickColor = BrickColor.new(pointColors[i])
+        b.Material = Enum.Material.SmoothPlastic
+        b.Anchored = true
+        b.CanCollide = false
+        b.Parent = folder
+        local a = Instance.new("Attachment", b)
+        a.Name = "BeamAttach"
+        parts[i] = b
+    end
+    for _, e in ipairs(edges) do
+        local beam = Instance.new("Beam", folder)
+        beam.Attachment0 = parts[e[1]]:FindFirstChild("BeamAttach")
+        beam.Attachment1 = parts[e[2]]:FindFirstChild("BeamAttach")
+        beam.Width0 = 0.12
+        beam.Width1 = 0.12
+        beam.Color = ColorSequence.new(Color3.fromRGB(255,0,0))
+        beam.Segments = 1
+        beam.Enabled = true
+        beam.Parent = folder
+    end
+    local char = player.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then
+        local w = 0
+        repeat task.wait(0.3); w=w+0.3; char = player.Character until (char and char:FindFirstChild("HumanoidRootPart")) or w > 10
+    end
+    local function upd()
+        char = player.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if not hrp then
+            for _, p in ipairs(parts) do p.Transparency = 1 end
+            return
+        end
+        for _, p in ipairs(parts) do p.Transparency = 0 end
+        local cf = hrp.CFrame
+        local r, u, l = cf.RightVector, cf.UpVector, cf.LookVector
+        for i=1,8 do
+            local o = offsets[i] or Vector3.zero
+            parts[i].Position = hrp.Position + (o.X*r) + (o.Y*u) + (o.Z*l)
+        end
+    end
+    local conn = RunService.Heartbeat:Connect(upd)
+    upd()
+    playerVisuals[player] = { folder=folder, parts=parts, connection=conn }
+end
+
+
+local function removePlayerVisual(player)
+    if playerVisuals[player] then
+        playerVisuals[player].folder:Destroy()
+        if playerVisuals[player].connection then playerVisuals[player].connection:Disconnect() end
+        playerVisuals[player] = nil
+    end
+end
+
+
+local function updateAllVisuals()
+    if boxFolder then updateSelfPositions() end
+    if boxFolder2 then updateDualPositions() end
+    if boxFolderSickle then updateSicklePositions() end
+    if boxHelper then updateHelperPositions() end
+end
+
+
+local defaultOffsets = {
+    Vector3.new(-7.5,-3,0), Vector3.new(7.5,-3,0), Vector3.new(7.5,-3,10), Vector3.new(-7.5,-3,10),
+    Vector3.new(-7.5,3,0), Vector3.new(7.5,3,0), Vector3.new(7.5,3,10), Vector3.new(-7.5,3,10),
+}
+for i=1,8 do offsets[i]=defaultOffsets[i]; offsets2[i]=defaultOffsets[i]; offsetsSickle[i]=defaultOffsets[i] end
+
+
+offsetsHelper = {
+    Vector3.new(-2.5,-3,0),Vector3.new(2.5,-3,0),Vector3.new(2.5,-3,9),Vector3.new(-2.5,-3,9),
+    Vector3.new(-2.5,7,0),Vector3.new(2.5,7,0),Vector3.new(2.5,7,9),Vector3.new(-2.5,7,9),
+}
+
+
+local function refreshInputBoxes()
+    if not inputBoxes then return end
+    local src = dualEnabled and offsets2 or offsets
+    for i, b in ipairs(inputBoxes) do
+        if b then
+            b.X.Text = string.format("%.2f", src[i].X)
+            b.Y.Text = string.format("%.2f", src[i].Y)
+            b.Z.Text = string.format("%.2f", src[i].Z)
+        end
+    end
+end
+
+
+local function setMainOffsets(n)
+    for i=1,8 do offsets[i]=n[i] end
+    refreshInputBoxes()
+    if boxFolder then updateSelfPositions() end
+    updateAllVisuals()
+end
+
+
+local function setDualOffsets(n)
+    for i=1,8 do offsets2[i]=n[i] end
+    refreshInputBoxes()
+    if boxFolder2 then updateDualPositions() end
+end
+
+
+local function setSwordDefault()
+    clearSickleVisuals()
+    local def = {Vector3.new(-7.5,-3,0),Vector3.new(7.5,-3,0),Vector3.new(7.5,-3,10),Vector3.new(-7.5,-3,10),Vector3.new(-7.5,3,0),Vector3.new(7.5,3,0),Vector3.new(7.5,3,10),Vector3.new(-7.5,3,10)}
+    if dualEnabled then setDualOffsets(def); UI:Notify("剑/锤/武士刀","双重辅助线已更新",2)
+    else setMainOffsets(def); UI:Notify("剑/锤/武士刀","已恢复默认边界",2) end
+end
+local function setBigSword()
+    clearSickleVisuals()
+    local big = {Vector3.new(-7.5,-3,0),Vector3.new(7.5,-3,0),Vector3.new(7.5,-3,11),Vector3.new(-7.5,-3,11),Vector3.new(-7.5,3,0),Vector3.new(7.5,3,0),Vector3.new(7.5,3,11),Vector3.new(-7.5,3,11)}
+    if dualEnabled then setDualOffsets(big); UI:Notify("大剑","双重辅助线已更新为深度 11",2)
+    else setMainOffsets(big); UI:Notify("大剑","边界深度已改为 11",2) end
+end
+local function setIceSpear()
+    clearSickleVisuals()
+    local ice = {Vector3.new(-3,-3,0),Vector3.new(3,-3,0),Vector3.new(3,-3,18),Vector3.new(-3,-3,18),Vector3.new(-3,3,0),Vector3.new(3,3,0),Vector3.new(3,3,18),Vector3.new(-3,3,18)}
+    if dualEnabled then setDualOffsets(ice); UI:Notify("冰矛","双重辅助线已更新",2)
+    else setMainOffsets(ice); UI:Notify("冰矛","7.5→3, 10→18",2) end
+end
+local function setRapierSword()
+    clearSickleVisuals()
+    local rap = {Vector3.new(-3,-3,0),Vector3.new(3,-3,0),Vector3.new(3,-3,10),Vector3.new(-3,-3,10),Vector3.new(-3,3,0),Vector3.new(3,3,0),Vector3.new(3,3,10),Vector3.new(-3,3,10)}
+    if dualEnabled then setDualOffsets(rap); UI:Notify("刺剑","双重辅助线已更新",2)
+    else setMainOffsets(rap); UI:Notify("刺剑","7.5→3",2) end
+end
+
+
+local function setHammerM2()
+    clearSickleVisuals()
+    local ham = {Vector3.new(-5,-3,0),Vector3.new(5,-3,0),Vector3.new(5,-3,9),Vector3.new(-5,-3,9),Vector3.new(-5,3,0),Vector3.new(5,3,0),Vector3.new(5,3,9),Vector3.new(-5,3,9)}
+    if dualEnabled then setDualOffsets(ham); UI:Notify("木槌M2","双重辅助线已更新",2)
+    else setMainOffsets(ham); UI:Notify("木槌M2","7.5→5, 10→9",2) end
+end
+
+
+-- 猎鹰矛M2：X±5, Y±3, Z 0/13
+local function setFalconSpear()
+    clearSickleVisuals()
+    local fs = {
+        Vector3.new(-5,-3,0),  Vector3.new(5,-3,0),  Vector3.new(5,-3,13),  Vector3.new(-5,-3,13),
+        Vector3.new(-5, 3,0),  Vector3.new(5, 3,0),  Vector3.new(5, 3,13),  Vector3.new(-5, 3,13),
+    }
+    if dualEnabled then setDualOffsets(fs); UI:Notify("猎鹰矛M2","双重辅助线已更新",2)
+    else setMainOffsets(fs); UI:Notify("猎鹰矛M2","X±5, Y±3, Z 0/13",2) end
+end
+
+
+local function setSpear()
+    clearSickleVisuals()
+    local sp = {Vector3.new(-2.5,-3,0),Vector3.new(2.5,-3,0),Vector3.new(2.5,-3,12),Vector3.new(-2.5,-3,12),Vector3.new(-2.5,3,0),Vector3.new(2.5,3,0),Vector3.new(2.5,3,12),Vector3.new(-2.5,3,12)}
+    if dualEnabled then setDualOffsets(sp); UI:Notify("矛","双重辅助线已更新",2)
+    else setMainOffsets(sp); UI:Notify("矛","7.5→2.5, 10→12",2) end
+end
+
+
+local function setFan()
+    clearSickleVisuals()
+    local fanMain = {Vector3.new(-5,-3,4),Vector3.new(5,-3,4),Vector3.new(5,-3,12),Vector3.new(-5,-3,12),Vector3.new(-5,3,4),Vector3.new(5,3,4),Vector3.new(5,3,12),Vector3.new(-5,3,12)}
+    if dualEnabled then
+        local fanDual = {
+            Vector3.new(-7.5,-3,3),
+            Vector3.new(7.5,-3,3),
+            Vector3.new(7.5,-3,13),
+            Vector3.new(-7.5,-3,13),
+            Vector3.new(-7.5,3,3),
+            Vector3.new(7.5,3,3),
+            Vector3.new(7.5,3,13),
+            Vector3.new(-7.5,3,13),
+        }
+        setDualOffsets(fanDual)
+        UI:Notify("扇子","双重辅助线已更新",2)
+    else
+        setMainOffsets(fanMain)
+        UI:Notify("扇子","已应用扇子偏移",2)
+    end
+end
+
+
+local function setSickle()
+    local main = {Vector3.new(-6,-3,0),Vector3.new(6,-3,0),Vector3.new(6,-3,9),Vector3.new(-6,-3,9),Vector3.new(-6,3,0),Vector3.new(6,3,0),Vector3.new(6,3,9),Vector3.new(-6,3,9)}
+    local ss = {Vector3.new(-2.5,-3,0),Vector3.new(2.5,-3,0),Vector3.new(2.5,-3,9),Vector3.new(-2.5,-3,9),Vector3.new(-2.5,7,0),Vector3.new(2.5,7,0),Vector3.new(2.5,7,9),Vector3.new(-2.5,7,9)}
+    setMainOffsets(main)
+    for i=1,8 do offsetsSickle[i]=ss[i] end
+    if not enabledToggle:Get() then
+        enabledToggle:Set(true)
+        buildSelfVisuals()
+        updateSelfPositions()
+        if updateConnection then updateConnection:Disconnect() end
+        updateConnection = RunService.Heartbeat:Connect(updateSelfPositions)
+    end
+    buildSickleVisuals()
+    updateSicklePositions()
+    if updateConnectionSickle then updateConnectionSickle:Disconnect() end
+    updateConnectionSickle = RunService.Heartbeat:Connect(updateSicklePositions)
+    UI:Notify("镰刀","已生成红色主箱 + 绿色副箱"..(dualEnabled and "（与双重辅助线共存）" or ""),2)
+end
+
+
+local function setFlyingOnionSword()
+    clearSickleVisuals()
+    local on = {Vector3.new(-7.5,-3,0),Vector3.new(7.5,-3,0),Vector3.new(7.5,-3,13),Vector3.new(-7.5,-3,13),Vector3.new(-7.5,3,0),Vector3.new(7.5,3,0),Vector3.new(7.5,3,13),Vector3.new(-7.5,3,13)}
+    if dualEnabled then setDualOffsets(on); UI:Notify("飞行洋葱剑M1","深度已改为13",2)
+    else setMainOffsets(on); UI:Notify("飞行洋葱剑M1","深度已改为13",2) end
+end
+
+
+local function setDiamondAxe()
+    clearSickleVisuals()
+    local ax = {Vector3.new(-7.5,-3,0),Vector3.new(7.5,-3,0),Vector3.new(7.5,-3,14),Vector3.new(-7.5,-3,14),Vector3.new(-7.5,3,0),Vector3.new(7.5,3,0),Vector3.new(7.5,3,14),Vector3.new(-7.5,3,14)}
+    if dualEnabled then setDualOffsets(ax); UI:Notify("钻石斧M1","深度已改为14",2)
+    else setMainOffsets(ax); UI:Notify("钻石斧M1","深度已改为14",2) end
+end
+
+
+local function setSpell()
+    clearSickleVisuals()
+    local sp = {Vector3.new(-7.5,-3,0),Vector3.new(7.5,-3,0),Vector3.new(7.5,-3,14),Vector3.new(-7.5,-3,14),Vector3.new(-7.5,7,0),Vector3.new(7.5,7,0),Vector3.new(7.5,7,14),Vector3.new(-7.5,7,14)}
+    if dualEnabled then setDualOffsets(sp); UI:Notify("法术","双重辅助线已更新：10→14, 正3→7",2)
+    else setMainOffsets(sp); UI:Notify("法术","已应用法术尺寸",2) end
+end
+
+
+local function setKrampus()
+    clearSickleVisuals()
+    if dualEnabled then
+        local kd = {Vector3.new(-4,-3,0),Vector3.new(4,-3,0),Vector3.new(4,-3,11),Vector3.new(-4,-3,11),Vector3.new(-4,10,0),Vector3.new(4,10,0),Vector3.new(4,10,11),Vector3.new(-4,10,11)}
+        setDualOffsets(kd); UI:Notify("克拉普姆斯","双重辅助线已更新",2)
+    else
+        local k = {Vector3.new(-9,-3,0),Vector3.new(9,-3,0),Vector3.new(9,-3,11),Vector3.new(-9,-3,11),Vector3.new(-9,3,0),Vector3.new(9,3,0),Vector3.new(9,3,11),Vector3.new(-9,3,11)}
+        setMainOffsets(k); UI:Notify("克拉普姆斯","13→11",2)
+    end
+end
+
+
+local function setMahoraga()
+    clearSickleVisuals()
+    if dualEnabled then
+        local md = {Vector3.new(-4,-3,0),Vector3.new(4,-3,0),Vector3.new(4,-3,14.5),Vector3.new(-4,-3,14.5),Vector3.new(-4,3,0),Vector3.new(4,3,0),Vector3.new(4,3,14.5),Vector3.new(-4,3,14.5)}
+        setDualOffsets(md); UI:Notify("马霍拉奇","双重辅助线 20→14.5",2)
+    else
+        local m = {Vector3.new(-7.5,-3,0),Vector3.new(7.5,-3,0),Vector3.new(7.5,-3,11),Vector3.new(-7.5,-3,11),Vector3.new(-7.5,3,0),Vector3.new(7.5,3,0),Vector3.new(7.5,3,11),Vector3.new(-7.5,3,11)}
+        setMainOffsets(m); UI:Notify("马霍拉奇","深度已改为11",2)
+    end
+end
+
+
+local function setExplosiveSpear()
+    clearSickleVisuals()
+    if dualEnabled then
+        local ed = {Vector3.new(-5,-3,0),Vector3.new(5,-3,0),Vector3.new(5,-3,12.5),Vector3.new(-5,-3,12.5),Vector3.new(-5,3,0),Vector3.new(5,3,0),Vector3.new(5,3,12.5),Vector3.new(-5,3,12.5)}
+        setDualOffsets(ed); UI:Notify("爆炸长矛","双重辅助线已更新",2)
+    else
+        local e = {Vector3.new(-7.5,-3,0),Vector3.new(7.5,-3,0),Vector3.new(7.5,-3,12),Vector3.new(-7.5,-3,12),Vector3.new(-7.5,3,0),Vector3.new(7.5,3,0),Vector3.new(7.5,3,12),Vector3.new(-7.5,3,12)}
+        setMainOffsets(e); UI:Notify("爆炸长矛","已应用爆炸长矛尺寸",2)
+    end
+end
+
+
+local function setDrill()
+    clearSickleVisuals()
+    if dualEnabled then
+        local dd = {
+            Vector3.new(-6,-3,20),
+            Vector3.new(6,-3,20),
+            Vector3.new(6,-3,35),
+            Vector3.new(-6,-3,35),
+            Vector3.new(-6,4,20),
+            Vector3.new(6,4,20),
+            Vector3.new(6,4,35),
+            Vector3.new(-6,4,35),
+        }
+        setDualOffsets(dd)
+        UI:Notify("钻头","双重辅助线已更新",2)
+    else
+        local d = {Vector3.new(-7.5,-3,0),Vector3.new(7.5,-3,0),Vector3.new(7.5,-3,14),Vector3.new(-7.5,-3,14),Vector3.new(-7.5,3,0),Vector3.new(7.5,3,0),Vector3.new(7.5,3,14),Vector3.new(-7.5,3,14)}
+        setMainOffsets(d)
+        UI:Notify("钻头","已应用钻头尺寸",2)
+    end
+end
+
+
+local enabledToggle = UI:CreateToggle(AssistTab, "启用边框 (自己)", false, function(enabled)
+    if enabled then
+        buildSelfVisuals()
+        updateSelfPositions()
+        if updateConnection then updateConnection:Disconnect() end
+        updateConnection = RunService.Heartbeat:Connect(updateSelfPositions)
+        if dualEnabled then
+            buildDualVisuals()
+            updateDualPositions()
+            if updateConnection2 then updateConnection2:Disconnect() end
+            updateConnection2 = RunService.Heartbeat:Connect(updateDualPositions)
+        end
+    else
+        clearSelfVisuals(); clearDualVisuals(); clearSickleVisuals(); clearHelperVisuals()
+    end
+end)
+
+
+local dualToggle = UI:CreateToggle(AssistTab, "双重辅助线", false, function(enabled)
+    dualEnabled = enabled
+    refreshInputBoxes()
+    if enabled then
+        buildDualVisuals()
+        updateDualPositions()
+        if updateConnection2 then updateConnection2:Disconnect() end
+        updateConnection2 = RunService.Heartbeat:Connect(updateDualPositions)
+    else
+        clearDualVisuals()
+    end
+end)
+
+
+local helperToggle = UI:CreateToggle(AssistTab, "镰刀辅助线 脚本有bug，其中一条不显示，请打开这个", false, function(enabled)
+    if enabled then
+        buildHelperVisuals()
+        updateHelperPositions()
+        if updateConnectionHelper then updateConnectionHelper:Disconnect() end
+        updateConnectionHelper = RunService.Heartbeat:Connect(updateHelperPositions)
+    else
+        clearHelperVisuals()
+    end
+end, 9)
+
+
+-- ========== 武器按钮四列网格 ==========
+local weapons = {
+    {"剑/锤/武士刀", UI.Theme.Success, setSwordDefault},
+    {"大剑", UI.Theme.Danger, setBigSword},
+    {"冰矛", UI.Theme.IceColor, setIceSpear},
+    {"刺剑", UI.Theme.RapierColor, setRapierSword},
+    {"木槌M2", UI.Theme.HammerColor, setHammerM2},
+    {"矛", UI.Theme.SpearColor, setSpear},
+    {"扇子", UI.Theme.FanColor, setFan},
+    {"镰刀", UI.Theme.SickleColor, setSickle},
+    {"飞行洋葱剑M1", UI.Theme.OnionColor, setFlyingOnionSword},
+    {"钻石斧M1", UI.Theme.DiamondColor, setDiamondAxe},
+    {"法术", UI.Theme.SpellColor, setSpell},
+    {"爆炸长矛", UI.Theme.ExplosiveSpearColor, setExplosiveSpear},
+    {"克拉普姆斯", UI.Theme.KrampusColor, setKrampus},
+    {"马霍拉奇", UI.Theme.MahoragaColor, setMahoraga},
+    {"钻头", UI.Theme.DrillColor, setDrill},
+    {"猎鹰矛M2", UI.Theme.FalconColor, setFalconSpear},
+}
+
+
+local grid = Instance.new("Frame", AssistTab)
+grid.Size = UDim2.new(1,0,0,156)  -- 4行×36 + 3×4间距
+grid.BackgroundTransparency = 1
+local gl = Instance.new("UIGridLayout", grid)
+gl.CellSize = UDim2.new(0.25,-3,0,36)
+gl.CellPadding = UDim2.new(0,4,0,4)
+gl.SortOrder = Enum.SortOrder.LayoutOrder
+
+
+for _, w in ipairs(weapons) do
+    local b = Instance.new("TextButton", grid)
+    b.BackgroundColor3 = w[2]
+    b.Text = w[1]
+    b.TextColor3 = Color3.new(1,1,1)
+    b.Font = Enum.Font.GothamBold
+    b.TextSize = 11
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0,6)
+    b.MouseButton1Click:Connect(w[3])
+end
+
+
+UI:CreateButton(AssistTab, "删除天空背景", function()
+    local s = Lighting:FindFirstChild("Sun Set")
+    if s then s:Destroy(); UI:Notify("成功","已删除天空背景",2)
+    else UI:Notify("提示","未找到天空背景",2) end
+end)
+
+
+local playerCat = UI:CreateCategory(AssistTab, "玩家边框")
+local activePlayers = {}
+
+
+local function refreshPlayerList()
+    for player, _ in pairs(activePlayers) do
+        if not player:IsDescendantOf(Players) then removePlayerVisual(player); activePlayers[player]=nil end
+    end
+    for _, c in ipairs(playerCat:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p == LocalPlayer then continue end
+        local b = Instance.new("TextButton", playerCat)
+        b.Size = UDim2.new(1,0,0,32)
+        b.BackgroundColor3 = activePlayers[p] and UI.Theme.Success or UI.Theme.Button
+        b.Text = p.Name
+        b.TextColor3 = UI.Theme.Text
+        b.Font = Enum.Font.GothamSemibold
+        b.TextSize = 13
+        Instance.new("UICorner", b).CornerRadius = UDim.new(0,6)
+        b.MouseButton1Click:Connect(function()
+            if activePlayers[p] then removePlayerVisual(p); activePlayers[p]=nil; b.BackgroundColor3=UI.Theme.Button
+            else createPlayerVisual(p); activePlayers[p]=true; b.BackgroundColor3=UI.Theme.Success end
+        end)
+    end
+end
+
+
+Players.PlayerAdded:Connect(function(p) task.wait(1); refreshPlayerList() end)
+Players.PlayerRemoving:Connect(function(p) removePlayerVisual(p); activePlayers[p]=nil; refreshPlayerList() end)
+refreshPlayerList()
+task.spawn(function() while true do task.wait(10); refreshPlayerList() end end)
+
+
+UI:CreateDivider(AssistTab)
+
+
+local batchFrame = Instance.new("Frame", AssistTab)
+batchFrame.Size = UDim2.new(1,0,0,70)
+batchFrame.BackgroundTransparency = 1
+
+
+local row1B = Instance.new("Frame", batchFrame)
+row1B.Size = UDim2.new(1,0,0,32)
+row1B.BackgroundTransparency = 1
+local l1 = Instance.new("UIListLayout", row1B)
+l1.FillDirection = Enum.FillDirection.Horizontal
+l1.Padding = UDim.new(0,4)
+l1.VerticalAlignment = Enum.VerticalAlignment.Center
+
+
+local bLabel = Instance.new("TextLabel", row1B)
+bLabel.Size = UDim2.new(0,70,1,0)
+bLabel.BackgroundTransparency = 1
+bLabel.Text = "批量修改"
+bLabel.TextColor3 = UI.Theme.Accent
+bLabel.Font = Enum.Font.GothamBold
+bLabel.TextSize = 12
+bLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+
+local fromBox = Instance.new("TextBox", row1B)
+fromBox.Size = UDim2.new(0.5,-40,0,22)
+fromBox.BackgroundColor3 = UI.Theme.Button
+fromBox.TextColor3 = UI.Theme.Text
+fromBox.Font = Enum.Font.Gotham
+fromBox.TextSize = 11
+fromBox.PlaceholderText = "被改"
+fromBox.Text = ""
+fromBox.ClearTextOnFocus = false
+
+
+local toBox = Instance.new("TextBox", row1B)
+toBox.Size = UDim2.new(0.5,-40,0,22)
+toBox.BackgroundColor3 = UI.Theme.Button
+toBox.TextColor3 = UI.Theme.Text
+toBox.Font = Enum.Font.Gotham
+toBox.TextSize = 11
+toBox.PlaceholderText = "改后"
+toBox.Text = ""
+toBox.ClearTextOnFocus = false
+
+
+local row2B = Instance.new("Frame", batchFrame)
+row2B.Size = UDim2.new(1,0,0,32)
+row2B.Position = UDim2.new(0,0,0,34)
+row2B.BackgroundTransparency = 1
+local l2 = Instance.new("UIListLayout", row2B)
+l2.FillDirection = Enum.FillDirection.Horizontal
+l2.Padding = UDim.new(0,4)
+l2.VerticalAlignment = Enum.VerticalAlignment.Center
+
+
+local symEnabled = false
+local symBtn = Instance.new("TextButton", row2B)
+symBtn.Size = UDim2.new(1,-70,1,0)
+symBtn.BackgroundColor3 = Color3.fromRGB(60,60,60)
+symBtn.Text = "只改数字 不改符号"
+symBtn.TextColor3 = UI.Theme.TextDim
+symBtn.Font = Enum.Font.GothamSemibold
+symBtn.TextSize = 11
+Instance.new("UICorner", symBtn).CornerRadius = UDim.new(0,6)
+
+
+local function updSym()
+    if symEnabled then symBtn.BackgroundColor3=UI.Theme.Success; symBtn.TextColor3=Color3.new(1,1,1)
+    else symBtn.BackgroundColor3=Color3.fromRGB(60,60,60); symBtn.TextColor3=UI.Theme.TextDim end
+end
+symBtn.MouseButton1Click:Connect(function() symEnabled = not symEnabled; updSym() end)
+
+
+local applyBtn = Instance.new("TextButton", row2B)
+applyBtn.Size = UDim2.new(0,60,1,0)
+applyBtn.BackgroundColor3 = UI.Theme.Accent
+applyBtn.Text = "修改"
+applyBtn.TextColor3 = Color3.new(1,1,1)
+applyBtn.Font = Enum.Font.GothamBold
+applyBtn.TextSize = 12
+Instance.new("UICorner", applyBtn).CornerRadius = UDim.new(0,6)
+
+
+applyBtn.MouseButton1Click:Connect(function()
+    local fn = tonumber(fromBox.Text)
+    local tn = tonumber(toBox.Text)
+    if not fn or not tn then UI:Notify("错误","请输入有效的数字",2); return end
+    local src = dualEnabled and offsets2 or offsets
+    local no = {}
+    for i=1,8 do
+        local v = src[i]
+        local x,y,z = v.X,v.Y,v.Z
+        local function rep(val)
+            if math.abs(val-fn) < 0.0001 then return tn
+            elseif symEnabled and math.abs(val+fn) < 0.0001 then return -tn end
+            return val
+        end
+        x,y,z = rep(x),rep(y),rep(z)
+        no[i] = Vector3.new(x,y,z)
+    end
+    if dualEnabled then setDualOffsets(no) else setMainOffsets(no) end
+    UI:Notify("批量修改","已应用替换",2)
+end)
+
+
+UI:CreateLabel(AssistTab, "调整后按回车生效 | 请保持矩形结构")
+
+
+inputBoxes = {}
+for i=1,8 do
+    local gf = Instance.new("Frame", AssistTab)
+    gf.Size = UDim2.new(1,0,0,36)
+    gf.BackgroundColor3 = UI.Theme.Button
+    Instance.new("UICorner", gf).CornerRadius = UDim.new(0,6)
+    local layout = Instance.new("UIListLayout", gf)
+    layout.FillDirection = Enum.FillDirection.Horizontal    layout.Padding = UDim.new(0,4)
+    layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    layout.VerticalAlignment = Enum.VerticalAlignment.Center
+
+
+    local lbl = Instance.new("TextLabel", gf)
+    lbl.Size = UDim2.new(0,24,1,0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = "P"..i
+    lbl.TextColor3 = pointColors[i]
+    lbl.Font = Enum.Font.GothamBold
+    lbl.TextSize = 13
+
+
+    local function createBox(axis, defaultVal)
+        local b = Instance.new("TextBox", gf)
+        b.Size = UDim2.new(0.33,-12,0,22)
+        b.BackgroundColor3 = pointColors[i]
+        b.TextColor3 = Color3.new(1,1,1)
+        b.Font = Enum.Font.Gotham
+        b.TextSize = 11
+        b.Text = string.format("%.2f", defaultVal)
+        b.PlaceholderText = axis
+        b.ClearTextOnFocus = false
+        b.FocusLost:Connect(function()
+            local n = tonumber(b.Text)
+            if n then
+                local v = dualEnabled and offsets2[i] or offsets[i]
+                if axis == "X" then
+                    if dualEnabled then offsets2[i]=Vector3.new(n,v.Y,v.Z) else offsets[i]=Vector3.new(n,v.Y,v.Z) end
+                elseif axis == "Y" then
+                    if dualEnabled then offsets2[i]=Vector3.new(v.X,n,v.Z) else offsets[i]=Vector3.new(v.X,n,v.Z) end
+                elseif axis == "Z" then
+                    if dualEnabled then offsets2[i]=Vector3.new(v.X,v.Y,n) else offsets[i]=Vector3.new(v.X,v.Y,n) end
+                end
+                if dualEnabled then if boxFolder2 then updateDualPositions() end
+                else if boxFolder then updateSelfPositions() end end
+                updateAllVisuals()
+            else
+                local src = dualEnabled and offsets2 or offsets
+                b.Text = string.format("%.2f", axis=="X" and src[i].X or axis=="Y" and src[i].Y or src[i].Z)
+            end
+        end)
+        return b
+    end
+
+
+    local off = defaultOffsets[i]
+    inputBoxes[i] = { X=createBox("X",off.X), Y=createBox("Y",off.Y), Z=createBox("Z",off.Z) }
+end
+
+
+refreshInputBoxes()
+
+
+-- 辅助页最底端：删除 CameraShakeConfig
+UI:CreateDivider(AssistTab)
+UI:CreateLabel(AssistTab, "其他")
+UI:CreateButton(AssistTab, "删除 屏幕抖动", function()
+    local ok, err = pcall(function()
+        local rs = game:GetService("ReplicatedStorage")
+        local target = rs:FindFirstChild("CameraShakeConfig", true)
+        if target then
+            target:Destroy()
+            UI:Notify("删除成功", "CameraShakeConfig 已删除", 2)
+            print("[删除] ReplicatedStorage.CameraShakeConfig 已删除")
+        else
+            UI:Notify("提示", "未找到 CameraShakeConfig", 2)
+            print("[删除] 未找到 CameraShakeConfig")
+        end
+    end)
+    if not ok then
+        UI:Notify("删除失败", tostring(err), 3)
+        warn("[删除] 失败: " .. tostring(err))
+    end
+end)
+
+
+-- ============ 音乐选项卡 ============
+local MusicTab = UI:CreateTab("音乐")
+
+
+local function getBGM()
+    local b = SoundService:FindFirstChild("BGM")
+    if not b then
+        b = Instance.new("Sound")
+        b.Name = "BGM"
+        b.Parent = SoundService
+        b.Looped = true
+        b.Playing = true
+    end
+    return b
+end
+
+
+local function extractId(sid)
+    local id = string.match(sid, "rbxassetid://(%d+)")
+    return id or sid
+end
+
+
+local idFrame = Instance.new("Frame", MusicTab)
+idFrame.Size = UDim2.new(1,0,0,32)
+idFrame.BackgroundColor3 = UI.Theme.Button
+Instance.new("UICorner", idFrame).CornerRadius = UDim.new(0,6)
+local idL = Instance.new("UIListLayout", idFrame)
+idL.FillDirection = Enum.FillDirection.Horizontal
+idL.Padding = UDim.new(0,4)
+idL.VerticalAlignment = Enum.VerticalAlignment.Center
+local idLb = Instance.new("TextLabel", idFrame)
+idLb.Size = UDim2.new(0,50,1,0)
+idLb.BackgroundTransparency = 1
+idLb.Text = "音乐ID"
+idLb.TextColor3 = UI.Theme.Text
+idLb.Font = Enum.Font.GothamSemibold
+idLb.TextSize = 12
+idLb.TextXAlignment = Enum.TextXAlignment.Left
+local idBox = Instance.new("TextBox", idFrame)
+idBox.Size = UDim2.new(1,-55,0,22)
+idBox.BackgroundColor3 = UI.Theme.ButtonHover
+idBox.TextColor3 = UI.Theme.Text
+idBox.Font = Enum.Font.Gotham
+idBox.TextSize = 12
+idBox.ClearTextOnFocus = false
+idBox.Text = extractId(getBGM().SoundId)
+idBox.FocusLost:Connect(function()
+    local inp = idBox.Text:gsub("%s+","")
+    if inp ~= "" then
+        getBGM().SoundId = "rbxassetid://"..inp
+        UI:Notify("音乐ID","已更改",2)
+    end
+end)
+
+
+local volFrame = Instance.new("Frame", MusicTab)
+volFrame.Size = UDim2.new(1,0,0,32)
+volFrame.BackgroundColor3 = UI.Theme.Button
+Instance.new("UICorner", volFrame).CornerRadius = UDim.new(0,6)
+local vl = Instance.new("UIListLayout", volFrame)
+vl.FillDirection = Enum.FillDirection.Horizontal
+vl.Padding = UDim.new(0,4)
+vl.VerticalAlignment = Enum.VerticalAlignment.Center
+local vLb = Instance.new("TextLabel", volFrame)
+vLb.Size = UDim2.new(0,50,1,0)
+vLb.BackgroundTransparency = 1
+vLb.Text = "音量"
+vLb.TextColor3 = UI.Theme.Text
+vLb.Font = Enum.Font.GothamSemibold
+vLb.TextSize = 12
+vLb.TextXAlignment = Enum.TextXAlignment.Left
+local volBox = Instance.new("TextBox", volFrame)
+volBox.Size = UDim2.new(1,-55,0,22)
+volBox.BackgroundColor3 = UI.Theme.ButtonHover
+volBox.TextColor3 = UI.Theme.Text
+volBox.Font = Enum.Font.Gotham
+volBox.TextSize = 12
+volBox.ClearTextOnFocus = false
+volBox.Text = tostring(getBGM().Volume)
+volBox.FocusLost:Connect(function()
+    local n = tonumber(volBox.Text)
+    if n and n>=0 and n<=10 then getBGM().Volume=n; UI:Notify("音量","已更改为 "..n,2)
+    else volBox.Text = tostring(getBGM().Volume) end
+end)
+
+
+local spFrame = Instance.new("Frame", MusicTab)
+spFrame.Size = UDim2.new(1,0,0,32)
+spFrame.BackgroundColor3 = UI.Theme.Button
+Instance.new("UICorner", spFrame).CornerRadius = UDim.new(0,6)
+local sl = Instance.new("UIListLayout", spFrame)
+sl.FillDirection = Enum.FillDirection.Horizontal
+sl.Padding = UDim.new(0,4)
+sl.VerticalAlignment = Enum.VerticalAlignment.Center
+local sLb = Instance.new("TextLabel", spFrame)
+sLb.Size = UDim2.new(0,50,1,0)
+sLb.BackgroundTransparency = 1
+sLb.Text = "速度"
+sLb.TextColor3 = UI.Theme.Text
+sLb.Font = Enum.Font.GothamSemibold
+sLb.TextSize = 12
+sLb.TextXAlignment = Enum.TextXAlignment.Left
+local spBox = Instance.new("TextBox", spFrame)
+spBox.Size = UDim2.new(1,-55,0,22)
+spBox.BackgroundColor3 = UI.Theme.ButtonHover
+spBox.TextColor3 = UI.Theme.Text
+spBox.Font = Enum.Font.Gotham
+spBox.TextSize = 12
+spBox.ClearTextOnFocus = false
+spBox.Text = tostring(getBGM().PlaybackSpeed)
+spBox.FocusLost:Connect(function()
+    local n = tonumber(spBox.Text)
+    if n and n>=0.1 and n<=10 then getBGM().PlaybackSpeed=n; UI:Notify("速度","已更改为 "..n,2)
+    else spBox.Text = tostring(getBGM().PlaybackSpeed) end
+end)
+
+
+local posFrame = Instance.new("Frame", MusicTab)
+posFrame.Size = UDim2.new(1,0,0,32)
+posFrame.BackgroundColor3 = UI.Theme.Button
+Instance.new("UICorner", posFrame).CornerRadius = UDim.new(0,6)
+local pl = Instance.new("UIListLayout", posFrame)
+pl.FillDirection = Enum.FillDirection.Horizontal
+pl.Padding = UDim.new(0,4)
+pl.VerticalAlignment = Enum.VerticalAlignment.Center
+local pLb = Instance.new("TextLabel", posFrame)
+pLb.Size = UDim2.new(0,50,1,0)
+pLb.BackgroundTransparency = 1
+pLb.Text = "进度"
+pLb.TextColor3 = UI.Theme.Text
+pLb.Font = Enum.Font.GothamSemibold
+pLb.TextSize = 12
+pLb.TextXAlignment = Enum.TextXAlignment.Left
+local posBox = Instance.new("TextBox", posFrame)
+posBox.Size = UDim2.new(1,-55,0,22)
+posBox.BackgroundColor3 = UI.Theme.ButtonHover
+posBox.TextColor3 = UI.Theme.Text
+posBox.Font = Enum.Font.Gotham
+posBox.TextSize = 12
+posBox.ClearTextOnFocus = false
+posBox.Text = string.format("%.2f", getBGM().TimePosition)
+posBox.FocusLost:Connect(function()
+    local n = tonumber(posBox.Text)
+    if n and n>=0 then
+        getBGM().TimePosition = n
+        posBox.Text = string.format("%.2f", n)
+        UI:Notify("进度","已跳转到 "..string.format("%.2f",n).." 秒",2)
+    else posBox.Text = string.format("%.2f", getBGM().TimePosition) end
+end)
+
+
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+        if not posBox.Focused then
+            local b = getBGM()
+            if b then posBox.Text = string.format("%.2f", b.TimePosition) end
+        end
+    end
+end)
+
+
+local playingToggle = UI:CreateToggle(MusicTab, "播放", true, function(enabled)
+    getBGM().Playing = enabled
+    UI:Notify("播放", enabled and "已开启" or "已关闭", 2)
+end)
+
+
+local loopToggle = UI:CreateToggle(MusicTab, "循环播放", true, function(enabled)
+    getBGM().Looped = enabled
+    UI:Notify("循环播放", enabled and "已开启" or "已关闭", 2)
+end)
+
+
+local fixedVolumeToggle = UI:CreateToggle(MusicTab, "固定音量", false, function(enabled)
+    UI:Notify("固定音量", enabled and "已开启" or "已关闭", 2)
+end)
+
+
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+        if fixedVolumeToggle:Get() then
+            local vn = tonumber(volBox.Text)
+            if vn and vn>=0 and vn<=10 then
+                local b = getBGM()
+                if b and math.abs(b.Volume - vn) > 0.01 then b.Volume = vn end
+            end
+        end
+    end
+end)
+
+
+local deleteMusicToggle = UI:CreateToggle(MusicTab, "循环删除他人音乐", false, function(enabled)
+    UI:Notify("循环删除他人音乐", enabled and "已开启" or "已关闭", 2)
+end)
+
+
+local delMusicCat = UI:CreateCategory(MusicTab, "删除其他人的表情音乐")
+local selectedDeletionPlayers = {}
+
+
+local function isSel(p)
+    for _, x in ipairs(selectedDeletionPlayers) do if x == p then return true end end
+    return false
+end
+
+
+local function toggleDel(p, btn)
+    if isSel(p) then
+        for i, x in ipairs(selectedDeletionPlayers) do
+            if x == p then table.remove(selectedDeletionPlayers, i); break end
+        end
+        btn.BackgroundColor3 = UI.Theme.Button
+    else
+        table.insert(selectedDeletionPlayers, p)
+        btn.BackgroundColor3 = UI.Theme.Success
+    end
+end
+
+
+local function refreshDelList()
+    for i = #selectedDeletionPlayers, 1, -1 do
+        if not selectedDeletionPlayers[i]:IsDescendantOf(Players) then table.remove(selectedDeletionPlayers, i) end
+    end
+    for _, c in ipairs(delMusicCat:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p == LocalPlayer then continue end
+        local b = Instance.new("TextButton", delMusicCat)
+        b.Size = UDim2.new(1,0,0,32)
+        b.BackgroundColor3 = isSel(p) and UI.Theme.Success or UI.Theme.Button
+        b.Text = p.Name
+        b.TextColor3 = UI.Theme.Text
+        b.Font = Enum.Font.GothamSemibold
+        b.TextSize = 13
+        Instance.new("UICorner", b).CornerRadius = UDim.new(0,6)
+        b.MouseButton1Click:Connect(function() toggleDel(p, b) end)
+    end
+end
+
+
+refreshDelList()
+Players.PlayerAdded:Connect(function(p) task.wait(1); refreshDelList() end)
+Players.PlayerRemoving:Connect(function(p)
+    for i = #selectedDeletionPlayers, 1, -1 do
+        if selectedDeletionPlayers[i] == p then table.remove(selectedDeletionPlayers, i) end
+    end
+    refreshDelList()
+end)
+task.spawn(function() while true do task.wait(10); refreshDelList() end end)
+
+
+task.spawn(function()
+    while true do
+        task.wait(0.5)
+        if deleteMusicToggle:Get() then
+            local pc = workspace:FindFirstChild("Player")
+            if pc then
+                for i = #selectedDeletionPlayers, 1, -1 do
+                    local p = selectedDeletionPlayers[i]
+                    if not p:IsDescendantOf(Players) then
+                        table.remove(selectedDeletionPlayers, i)
+                        refreshDelList()
+                        continue
+                    end
+                    local po = pc:FindFirstChild(p.Name)
+                    if po then
+                        local hrp = po:FindFirstChild("HumanoidRootPart")
+                        if hrp then
+                            for _, c in ipairs(hrp:GetDescendants()) do
+                                if c:IsA("Sound") then c:Destroy() end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+
+UI:SwitchTab("传送")
+
+
+local ContentLayout = UI.Content:FindFirstChildOfClass("UIListLayout")
+if ContentLayout then
+    local function updateCanvasSize()
+        UI.Content.CanvasSize = UDim2.new(0,0,0,ContentLayout.AbsoluteContentSize.Y)
+    end
+    ContentLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateCanvasSize)
+    task.spawn(updateCanvasSize)
+end
+
+
+debugPrint("=== Elite Controller V20 加载完成 ===")
+UI:Notify("加载成功","按 RightCtrl 显示/隐藏UI",5)
+print("Elite Controller 脚本执行完毕。")
