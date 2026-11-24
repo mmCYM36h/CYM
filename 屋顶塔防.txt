@@ -1,0 +1,575 @@
+-- [[ RC2 Elite Controller V26 - 音乐恢复 + 快速选歌 ]]
+print(">>> 脚本开始 <<<")
+
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local TeleportService = game:GetService("TeleportService")
+local SoundService = game:GetService("SoundService")
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+local TARGET_SERVER_PLACE_ID = 109809310370309
+local TARGET_COORD = Vector3.new(-8290, 405, 1756)
+
+-- ============ 传送工具 ============
+local function teleportTo(pos)
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then print("[传送] 角色不存在") return false end
+    pcall(function()
+        hrp.CFrame = CFrame.new(pos + Vector3.new(0,3,0))
+        hrp.AssemblyLinearVelocity = Vector3.zero
+        hrp.AssemblyAngularVelocity = Vector3.zero
+    end)
+    print("[传送] →", tostring(pos))
+    return true
+end
+
+-- ============ UI ============
+local gui = Instance.new("ScreenGui")
+gui.Name = "EliteControllerV26"
+gui.ResetOnSpawn = false
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+gui.DisplayOrder = 100
+gui.Parent = PlayerGui
+
+local Main = Instance.new("Frame")
+Main.Size = UDim2.new(0,320,0,420)
+Main.Position = UDim2.new(0.5,-160,0.5,-210)
+Main.BackgroundColor3 = Color3.fromRGB(25,25,35)
+Main.BorderSizePixel = 0
+Main.Active = true
+Main.Draggable = true
+Main.Parent = gui
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0,10)
+
+local Header = Instance.new("Frame")
+Header.Size = UDim2.new(1,0,0,40)
+Header.BackgroundColor3 = Color3.fromRGB(35,35,50)
+Header.BorderSizePixel = 0
+Header.Parent = Main
+Instance.new("UICorner", Header).CornerRadius = UDim.new(0,10)
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1,-80,1,0)
+Title.Position = UDim2.new(0,15,0,0)
+Title.BackgroundTransparency = 1
+Title.Text = "决斗勇士 V26"
+Title.TextColor3 = Color3.new(1,1,1)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 16
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = Header
+
+local MinBtn = Instance.new("TextButton")
+MinBtn.Size = UDim2.new(0,30,0,30)
+MinBtn.Position = UDim2.new(1,-70,0,5)
+MinBtn.BackgroundColor3 = Color3.fromRGB(255,180,50)
+MinBtn.Text = "-"
+MinBtn.TextColor3 = Color3.new(0,0,0)
+MinBtn.Font = Enum.Font.GothamBold
+MinBtn.TextSize = 20
+MinBtn.Parent = Header
+Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(0,6)
+
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0,30,0,30)
+CloseBtn.Position = UDim2.new(1,-35,0,5)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(220,80,80)
+CloseBtn.Text = "×"
+CloseBtn.TextColor3 = Color3.new(1,1,1)
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.TextSize = 20
+CloseBtn.Parent = Header
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0,6)
+
+local TabBar = Instance.new("Frame")
+TabBar.Size = UDim2.new(1,-20,0,35)
+TabBar.Position = UDim2.new(0,10,0,45)
+TabBar.BackgroundTransparency = 1
+TabBar.Parent = Main
+local TL = Instance.new("UIListLayout", TabBar)
+TL.FillDirection = Enum.FillDirection.Horizontal
+TL.Padding = UDim.new(0,5)
+
+local Content = Instance.new("ScrollingFrame")
+Content.Size = UDim2.new(1,-20,1,-95)
+Content.Position = UDim2.new(0,10,0,85)
+Content.BackgroundTransparency = 1
+Content.BorderSizePixel = 0
+Content.ScrollBarThickness = 4
+Content.ScrollBarImageColor3 = Color3.fromRGB(100,180,255)
+Content.CanvasSize = UDim2.new(0,0,0,0)
+Content.AutomaticCanvasSize = Enum.AutomaticSize.Y
+Content.Parent = Main
+local CL = Instance.new("UIListLayout", Content)
+CL.Padding = UDim.new(0,8)
+
+local tabs = {}
+local currentTab = nil
+
+local function switchTab(name)
+    for tn, tab in pairs(tabs) do
+        if tn == name then
+            tab.Button.BackgroundColor3 = Color3.fromRGB(80,140,220)
+            tab.Button.TextColor3 = Color3.new(1,1,1)
+            tab.Content.Visible = true
+            currentTab = name
+        else
+            tab.Button.BackgroundColor3 = Color3.fromRGB(45,45,65)
+            tab.Button.TextColor3 = Color3.fromRGB(180,180,180)
+            tab.Content.Visible = false
+        end
+    end
+end
+
+local function createTab(name)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0,80,1,0)
+    btn.BackgroundColor3 = Color3.fromRGB(45,45,65)
+    btn.Text = name
+    btn.TextColor3 = Color3.fromRGB(180,180,180)
+    btn.Font = Enum.Font.GothamSemibold
+    btn.TextSize = 11
+    btn.AutoButtonColor = false
+    btn.Parent = TabBar
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0,6)
+    local content = Instance.new("Frame")
+    content.Size = UDim2.new(1,0,0,0)
+    content.BackgroundTransparency = 1
+    content.AutomaticSize = Enum.AutomaticSize.Y
+    content.Visible = false
+    content.Parent = Content
+    local l = Instance.new("UIListLayout", content)
+    l.Padding = UDim.new(0,6)
+    tabs[name] = { Button = btn, Content = content }
+    btn.MouseButton1Click:Connect(function() switchTab(name) end)
+    if not currentTab then switchTab(name) end
+    return content
+end
+
+local function createButton(parent, text, callback, color)
+    local b = Instance.new("TextButton")
+    b.Size = UDim2.new(1,0,0,32)
+    b.BackgroundColor3 = color or Color3.fromRGB(45,45,65)
+    b.Text = text
+    b.TextColor3 = Color3.new(1,1,1)
+    b.Font = Enum.Font.GothamSemibold
+    b.TextSize = 13
+    b.AutoButtonColor = false
+    b.Parent = parent
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0,6)
+    b.MouseEnter:Connect(function()
+        TweenService:Create(b, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(60,60,85)}):Play()
+    end)
+    b.MouseLeave:Connect(function()
+        TweenService:Create(b, TweenInfo.new(0.15), {BackgroundColor3 = color or Color3.fromRGB(45,45,65)}):Play()
+    end)
+    b.MouseButton1Click:Connect(function()
+        local ok, err = pcall(callback)
+        if not ok then warn("[按钮出错] " .. tostring(err)) end
+    end)
+    return b
+end
+
+local function createLabel(parent, text)
+    local l = Instance.new("TextLabel")
+    l.Size = UDim2.new(1,0,0,28)
+    l.BackgroundColor3 = Color3.fromRGB(35,35,50)
+    l.Text = "  " .. text
+    l.TextColor3 = Color3.fromRGB(100,180,255)
+    l.Font = Enum.Font.GothamBold
+    l.TextSize = 13
+    l.TextXAlignment = Enum.TextXAlignment.Left
+    l.Parent = parent
+    Instance.new("UICorner", l).CornerRadius = UDim.new(0,6)
+    return l
+end
+
+local function createToggle(parent, text, default, callback, textSize)
+    local f = Instance.new("Frame")
+    f.Size = UDim2.new(1,0,0,32)
+    f.BackgroundColor3 = Color3.fromRGB(45,45,65)
+    f.Parent = parent
+    Instance.new("UICorner", f).CornerRadius = UDim.new(0,6)
+    local lb = Instance.new("TextLabel")
+    lb.Size = UDim2.new(1,-60,1,0)
+    lb.Position = UDim2.new(0,10,0,0)
+    lb.BackgroundTransparency = 1
+    lb.Text = text
+    lb.TextColor3 = Color3.new(1,1,1)
+    lb.Font = Enum.Font.GothamSemibold
+    lb.TextSize = textSize or 13
+    lb.TextXAlignment = Enum.TextXAlignment.Left
+    lb.Parent = f
+    local bg = Instance.new("Frame")
+    bg.Size = UDim2.new(0,44,0,22)
+    bg.Position = UDim2.new(1,-54,0.5,-11)
+    bg.BackgroundColor3 = Color3.fromRGB(60,60,60)
+    bg.Parent = f
+    Instance.new("UICorner", bg).CornerRadius = UDim.new(0,4)
+    local c = Instance.new("Frame")
+    c.Size = UDim2.new(0,18,0,18)
+    c.Position = UDim2.new(0,2,0.5,-9)
+    c.BackgroundColor3 = Color3.new(1,1,1)
+    c.Parent = bg
+    Instance.new("UICorner", c).CornerRadius = UDim.new(0,3)
+    local enabled = default or false
+    local function upd()
+        if enabled then
+            TweenService:Create(bg,TweenInfo.new(0.2),{BackgroundColor3=Color3.fromRGB(80,200,120)}):Play()
+            TweenService:Create(c,TweenInfo.new(0.2),{Position=UDim2.new(1,-20,0.5,-9)}):Play()
+        else
+            TweenService:Create(bg,TweenInfo.new(0.2),{BackgroundColor3=Color3.fromRGB(60,60,60)}):Play()
+            TweenService:Create(c,TweenInfo.new(0.2),{Position=UDim2.new(0,2,0.5,-9)}):Play()
+        end
+    end
+    upd()
+    local ca = Instance.new("TextButton")
+    ca.Size = UDim2.new(1,0,1,0)
+    ca.BackgroundTransparency = 1
+    ca.Text = ""
+    ca.Parent = f
+    ca.MouseButton1Click:Connect(function()
+        enabled = not enabled
+        upd()
+        if callback then callback(enabled) end
+    end)
+    return { Set = function(_,v) enabled=v; upd() end, Get = function() return enabled end }
+end
+
+local TeleTab = createTab("传送")
+local AssistTab = createTab("辅助")
+local MusicTab = createTab("音乐")
+
+-- ============ 传送页 ============
+createLabel(TeleTab, "服务器传送")
+createButton(TeleTab, "传送到服务器ID 109809310370309", function()
+    if game.PlaceId == TARGET_SERVER_PLACE_ID then
+        print("[服务器] 已在目标游戏中")
+        return
+    end
+    local ok, err = pcall(function()
+        TeleportService:Teleport(TARGET_SERVER_PLACE_ID, LocalPlayer)
+    end)
+    print("[服务器] 传送结果:", ok, err)
+    if not ok then
+        print("[服务器] 加入链接: https://www.roblox.com/games/start?placeId=" .. TARGET_SERVER_PLACE_ID)
+    end
+end, Color3.fromRGB(80,140,220))
+
+createLabel(TeleTab, "坐标传送")
+createButton(TeleTab, "传送到 (-8290, 405, 1756)", function()
+    teleportTo(TARGET_COORD)
+end, Color3.fromRGB(80,200,120))
+
+-- ============ 辅助页 ============
+createLabel(AssistTab, "装备快捷")
+
+createButton(AssistTab, "4弗兰克血神", function()
+    local RS = game:GetService("ReplicatedStorage")
+    local equip = RS:WaitForChild("Modules", 9e9)
+        :WaitForChild("Remotes", 9e9)
+        :WaitForChild("RemoteEvent", 9e9)
+        :WaitForChild("Equip", 9e9)
+    local list = {
+        { "tower4350", 1 },
+        { "tower4196", 2 },
+        { "tower4095", 3 },
+        { "tower4357", 4 },
+        { "tower4097", 5 },
+    }
+    for _, item in ipairs(list) do
+        local ok, err = pcall(function()
+            equip:FireServer(item[1], item[2])
+        end)
+        print("[4弗兰克血神] " .. item[1] .. " 槽" .. item[2] .. " 结果:", ok, err)
+    end
+end, Color3.fromRGB(220,80,80))
+
+createButton(AssistTab, "债务南瓜科学沙子策划", function()
+    local RS = game:GetService("ReplicatedStorage")
+    local equip = RS:WaitForChild("Modules", 9e9)
+        :WaitForChild("Remotes", 9e9)
+        :WaitForChild("RemoteEvent", 9e9)
+        :WaitForChild("Equip", 9e9)
+    local list = {
+        { "tower3", 1 },
+        { "tower5286", 2 },
+        { "tower4311", 3 },
+        { "tower6918", 4 },
+        { "tower5192", 5 },
+    }
+    for _, item in ipairs(list) do
+        local ok, err = pcall(function()
+            equip:FireServer(item[1], item[2])
+        end)
+        print("[债务南瓜科学沙子策划] " .. item[1] .. " 槽" .. item[2] .. " 结果:", ok, err)
+    end
+end, Color3.fromRGB(255,140,0))
+
+createButton(AssistTab, "3天使1恶魔1大师", function()
+    local RS = game:GetService("ReplicatedStorage")
+    local equip = RS:WaitForChild("Modules", 9e9)
+        :WaitForChild("Remotes", 9e9)
+        :WaitForChild("RemoteEvent", 9e9)
+        :WaitForChild("Equip", 9e9)
+    local list = {
+        { "tower6327", 1 },
+        { "tower5646", 2 },
+        { "tower5465", 3 },
+        { "tower5669", 4 },
+        { "tower5191", 5 },
+    }
+    for _, item in ipairs(list) do
+        local ok, err = pcall(function()
+            equip:FireServer(item[1], item[2])
+        end)
+        print("[3天使1恶魔1大师] " .. item[1] .. " 槽" .. item[2] .. " 结果:", ok, err)
+    end
+end, Color3.fromRGB(186,85,211))
+
+-- ============ 音乐页 ============
+local function getBGM()
+    local b = SoundService:FindFirstChild("BGM")
+    if not b then
+        b = Instance.new("Sound")
+        b.Name = "BGM"
+        b.Parent = SoundService
+        b.Looped = true
+        b.Playing = true
+    end
+    return b
+end
+
+local function extractId(sid)
+    local id = string.match(sid, "rbxassetid://(%d+)")
+    return id or sid
+end
+
+createLabel(MusicTab, "音乐控制")
+
+local idFrame = Instance.new("Frame")
+idFrame.Size = UDim2.new(1,0,0,32)
+idFrame.BackgroundColor3 = Color3.fromRGB(45,45,65)
+idFrame.Parent = MusicTab
+Instance.new("UICorner", idFrame).CornerRadius = UDim.new(0,6)
+local idL = Instance.new("UIListLayout", idFrame)
+idL.FillDirection = Enum.FillDirection.Horizontal
+idL.Padding = UDim.new(0,4)
+idL.VerticalAlignment = Enum.VerticalAlignment.Center
+local idLb = Instance.new("TextLabel")
+idLb.Size = UDim2.new(0,50,1,0)
+idLb.BackgroundTransparency = 1
+idLb.Text = "音乐ID"
+idLb.TextColor3 = Color3.new(1,1,1)
+idLb.Font = Enum.Font.GothamSemibold
+idLb.TextSize = 12
+idLb.TextXAlignment = Enum.TextXAlignment.Left
+idLb.Parent = idFrame
+local idBox = Instance.new("TextBox")
+idBox.Size = UDim2.new(1,-55,0,22)
+idBox.BackgroundColor3 = Color3.fromRGB(60,60,85)
+idBox.TextColor3 = Color3.new(1,1,1)
+idBox.Font = Enum.Font.Gotham
+idBox.TextSize = 12
+idBox.ClearTextOnFocus = false
+idBox.Text = extractId(getBGM().SoundId)
+idBox.Parent = idFrame
+idBox.FocusLost:Connect(function()
+    local inp = idBox.Text:gsub("%s+","")
+    if inp ~= "" then
+        getBGM().SoundId = "rbxassetid://"..inp
+        print("[音乐] ID 已更改为", inp)
+    end
+end)
+
+local volFrame = Instance.new("Frame")
+volFrame.Size = UDim2.new(1,0,0,32)
+volFrame.BackgroundColor3 = Color3.fromRGB(45,45,65)
+volFrame.Parent = MusicTab
+Instance.new("UICorner", volFrame).CornerRadius = UDim.new(0,6)
+local vl = Instance.new("UIListLayout", volFrame)
+vl.FillDirection = Enum.FillDirection.Horizontal
+vl.Padding = UDim.new(0,4)
+vl.VerticalAlignment = Enum.VerticalAlignment.Center
+local vLb = Instance.new("TextLabel")
+vLb.Size = UDim2.new(0,50,1,0)
+vLb.BackgroundTransparency = 1
+vLb.Text = "音量"
+vLb.TextColor3 = Color3.new(1,1,1)
+vLb.Font = Enum.Font.GothamSemibold
+vLb.TextSize = 12
+vLb.TextXAlignment = Enum.TextXAlignment.Left
+vLb.Parent = volFrame
+local volBox = Instance.new("TextBox")
+volBox.Size = UDim2.new(1,-55,0,22)
+volBox.BackgroundColor3 = Color3.fromRGB(60,60,85)
+volBox.TextColor3 = Color3.new(1,1,1)
+volBox.Font = Enum.Font.Gotham
+volBox.TextSize = 12
+volBox.ClearTextOnFocus = false
+volBox.Text = tostring(getBGM().Volume)
+volBox.Parent = volFrame
+volBox.FocusLost:Connect(function()
+    local n = tonumber(volBox.Text)
+    if n and n>=0 and n<=10 then getBGM().Volume=n; print("[音乐] 音量 →", n)
+    else volBox.Text = tostring(getBGM().Volume) end
+end)
+
+local spFrame = Instance.new("Frame")
+spFrame.Size = UDim2.new(1,0,0,32)
+spFrame.BackgroundColor3 = Color3.fromRGB(45,45,65)
+spFrame.Parent = MusicTab
+Instance.new("UICorner", spFrame).CornerRadius = UDim.new(0,6)
+local sl = Instance.new("UIListLayout", spFrame)
+sl.FillDirection = Enum.FillDirection.Horizontal
+sl.Padding = UDim.new(0,4)
+sl.VerticalAlignment = Enum.VerticalAlignment.Center
+local sLb = Instance.new("TextLabel")
+sLb.Size = UDim2.new(0,50,1,0)
+sLb.BackgroundTransparency = 1
+sLb.Text = "速度"
+sLb.TextColor3 = Color3.new(1,1,1)
+sLb.Font = Enum.Font.GothamSemibold
+sLb.TextSize = 12
+sLb.TextXAlignment = Enum.TextXAlignment.Left
+sLb.Parent = spFrame
+local spBox = Instance.new("TextBox")
+spBox.Size = UDim2.new(1,-55,0,22)
+spBox.BackgroundColor3 = Color3.fromRGB(60,60,85)
+spBox.TextColor3 = Color3.new(1,1,1)
+spBox.Font = Enum.Font.Gotham
+spBox.TextSize = 12
+spBox.ClearTextOnFocus = false
+spBox.Text = tostring(getBGM().PlaybackSpeed)
+spBox.Parent = spFrame
+spBox.FocusLost:Connect(function()
+    local n = tonumber(spBox.Text)
+    if n and n>=0.1 and n<=10 then getBGM().PlaybackSpeed=n; print("[音乐] 速度 →", n)
+    else spBox.Text = tostring(getBGM().PlaybackSpeed) end
+end)
+
+local posFrame = Instance.new("Frame")
+posFrame.Size = UDim2.new(1,0,0,32)
+posFrame.BackgroundColor3 = Color3.fromRGB(45,45,65)
+posFrame.Parent = MusicTab
+Instance.new("UICorner", posFrame).CornerRadius = UDim.new(0,6)
+local pl = Instance.new("UIListLayout", posFrame)
+pl.FillDirection = Enum.FillDirection.Horizontal
+pl.Padding = UDim.new(0,4)
+pl.VerticalAlignment = Enum.VerticalAlignment.Center
+local pLb = Instance.new("TextLabel")
+pLb.Size = UDim2.new(0,50,1,0)
+pLb.BackgroundTransparency = 1
+pLb.Text = "进度"
+pLb.TextColor3 = Color3.new(1,1,1)
+pLb.Font = Enum.Font.GothamSemibold
+pLb.TextSize = 12
+pLb.TextXAlignment = Enum.TextXAlignment.Left
+pLb.Parent = posFrame
+local posBox = Instance.new("TextBox")
+posBox.Size = UDim2.new(1,-55,0,22)
+posBox.BackgroundColor3 = Color3.fromRGB(60,60,85)
+posBox.TextColor3 = Color3.new(1,1,1)
+posBox.Font = Enum.Font.Gotham
+posBox.TextSize = 12
+posBox.ClearTextOnFocus = false
+posBox.Text = string.format("%.2f", getBGM().TimePosition)
+posBox.Parent = posFrame
+posBox.FocusLost:Connect(function()
+    local n = tonumber(posBox.Text)
+    if n and n>=0 then
+        getBGM().TimePosition = n
+        posBox.Text = string.format("%.2f", n)
+        print("[音乐] 进度 →", n)
+    else posBox.Text = string.format("%.2f", getBGM().TimePosition) end
+end)
+
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+        if not posBox.Focused then
+            local b = getBGM()
+            if b then posBox.Text = string.format("%.2f", b.TimePosition) end
+        end
+    end
+end)
+
+local playingToggle = createToggle(MusicTab, "播放", true, function(enabled)
+    getBGM().Playing = enabled
+    print("[音乐] 播放", enabled and "开启" or "关闭")
+end)
+
+local loopToggle = createToggle(MusicTab, "循环播放", true, function(enabled)
+    getBGM().Looped = enabled
+    print("[音乐] 循环", enabled and "开启" or "关闭")
+end)
+
+local fixedVolumeToggle = createToggle(MusicTab, "固定音量", false, function(enabled)
+    print("[音乐] 固定音量", enabled and "开启" or "关闭")
+end)
+
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+        if fixedVolumeToggle:Get() then
+            local vn = tonumber(volBox.Text)
+            if vn and vn>=0 and vn<=10 then
+                local b = getBGM()
+                if b and math.abs(b.Volume - vn) > 0.01 then b.Volume = vn end
+            end
+        end
+    end
+end)
+
+-- 快速选歌
+createLabel(MusicTab, "快速选歌")
+local songList = {
+    { "辞九门回忆", "124384558101360" },
+    { "植物大战僵尸传送带", "97296738811384" },
+    { "雨爱", "79277371759525" },
+    { "堕落", "98850529016454" },
+    { "不得不爱", "116497979556639" },
+}
+for _, song in ipairs(songList) do
+    createButton(MusicTab, song[1], function()
+        local b = getBGM()
+        b.SoundId = "rbxassetid://" .. song[2]
+        b:Play()
+        idBox.Text = song[2]
+        print("[音乐] 切换到", song[1], song[2])
+    end, Color3.fromRGB(80,200,120))
+end
+
+-- ============ 最小化 / 关闭 ============
+local minimized = false
+MinBtn.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    if minimized then
+        Main.Size = UDim2.new(0,320,0,40)
+        Content.Visible = false
+        TabBar.Visible = false
+    else
+        Main.Size = UDim2.new(0,320,0,420)
+        Content.Visible = true
+        TabBar.Visible = true
+    end
+end)
+
+CloseBtn.MouseButton1Click:Connect(function() gui.Enabled = false end)
+
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if input.KeyCode == Enum.KeyCode.RightControl then gui.Enabled = not gui.Enabled end
+end)
+
+local function updateCanvas()
+    Content.CanvasSize = UDim2.new(0, 0, 0, CL.AbsoluteContentSize.Y)
+end
+CL:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateCanvas)
+updateCanvas()
+
+print(">>> 脚本全部完成，UI 应已显示 <<<")
