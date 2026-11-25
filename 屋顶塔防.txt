@@ -1,4 +1,4 @@
--- [[ RC2 Elite Controller V26 - 音乐恢复 + 快速选歌 ]]
+-- [[ RC2 Elite Controller V27 - 最终整合版 ]]
 print(">>> 脚本开始 <<<")
 
 local Players = game:GetService("Players")
@@ -27,9 +27,9 @@ local function teleportTo(pos)
     return true
 end
 
--- ============ UI ============
+-- ============ UI 框架 ============
 local gui = Instance.new("ScreenGui")
-gui.Name = "EliteControllerV26"
+gui.Name = "EliteControllerV27"
 gui.ResetOnSpawn = false
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.DisplayOrder = 100
@@ -56,7 +56,7 @@ local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1,-80,1,0)
 Title.Position = UDim2.new(0,15,0,0)
 Title.BackgroundTransparency = 1
-Title.Text = "决斗勇士 V26"
+Title.Text = "决斗勇士 V27"
 Title.TextColor3 = Color3.new(1,1,1)
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 16
@@ -265,71 +265,62 @@ createButton(TeleTab, "传送到 (-8290, 405, 1756)", function()
     teleportTo(TARGET_COORD)
 end, Color3.fromRGB(80,200,120))
 
+createLabel(TeleTab, "跨服加入 (朋友)")
+local jobFrame = Instance.new("Frame")
+jobFrame.Size = UDim2.new(1,0,0,32)
+jobFrame.BackgroundColor3 = Color3.fromRGB(45,45,65)
+jobFrame.Parent = TeleTab
+Instance.new("UICorner", jobFrame).CornerRadius = UDim.new(0,6)
+local jobBox = Instance.new("TextBox")
+jobBox.Size = UDim2.new(1,-10,1,-10)
+jobBox.Position = UDim2.new(0,5,0,5)
+jobBox.BackgroundTransparency = 1
+jobBox.PlaceholderText = "在此粘贴朋友的 JobId"
+jobBox.Text = ""
+jobBox.TextColor3 = Color3.new(1,1,1)
+jobBox.Font = Enum.Font.Gotham
+jobBox.TextSize = 12
+jobBox.ClearTextOnFocus = false
+jobBox.Parent = jobFrame
+createButton(TeleTab, "加入朋友服务器", function()
+    local jid = jobBox.Text:gsub("%s+", "")
+    if #jid < 30 then print("JobId格式错误") return end
+    local ok, err = pcall(function()
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, jid, LocalPlayer)
+    end)
+    print("[跨服] 传送结果:", ok, err)
+end, Color3.fromRGB(255,140,0))
+
 -- ============ 辅助页 ============
 createLabel(AssistTab, "装备快捷")
 
 createButton(AssistTab, "4弗兰克血神", function()
-    local RS = game:GetService("ReplicatedStorage")
-    local equip = RS:WaitForChild("Modules", 9e9)
-        :WaitForChild("Remotes", 9e9)
-        :WaitForChild("RemoteEvent", 9e9)
-        :WaitForChild("Equip", 9e9)
-    local list = {
-        { "tower4350", 1 },
-        { "tower4196", 2 },
-        { "tower4095", 3 },
-        { "tower4357", 4 },
-        { "tower4097", 5 },
-    }
-    for _, item in ipairs(list) do
-        local ok, err = pcall(function()
-            equip:FireServer(item[1], item[2])
-        end)
-        print("[4弗兰克血神] " .. item[1] .. " 槽" .. item[2] .. " 结果:", ok, err)
+    local equip = game:GetService("ReplicatedStorage"):WaitForChild("Modules", 9e9):WaitForChild("Remotes", 9e9):WaitForChild("RemoteEvent", 9e9):WaitForChild("Equip", 9e9)
+    for _, item in ipairs({{ "tower4350", 1 },{ "tower4196", 2 },{ "tower4095", 3 },{ "tower4357", 4 },{ "tower4097", 5 }}) do
+        pcall(function() equip:FireServer(item[1], item[2]) end)
     end
 end, Color3.fromRGB(220,80,80))
 
 createButton(AssistTab, "债务南瓜科学沙子策划", function()
-    local RS = game:GetService("ReplicatedStorage")
-    local equip = RS:WaitForChild("Modules", 9e9)
-        :WaitForChild("Remotes", 9e9)
-        :WaitForChild("RemoteEvent", 9e9)
-        :WaitForChild("Equip", 9e9)
-    local list = {
-        { "tower3", 1 },
-        { "tower5286", 2 },
-        { "tower4311", 3 },
-        { "tower6918", 4 },
-        { "tower5192", 5 },
-    }
-    for _, item in ipairs(list) do
-        local ok, err = pcall(function()
-            equip:FireServer(item[1], item[2])
-        end)
-        print("[债务南瓜科学沙子策划] " .. item[1] .. " 槽" .. item[2] .. " 结果:", ok, err)
+    local equip = game:GetService("ReplicatedStorage"):WaitForChild("Modules", 9e9):WaitForChild("Remotes", 9e9):WaitForChild("RemoteEvent", 9e9):WaitForChild("Equip", 9e9)
+    for _, item in ipairs({{ "tower3", 1 },{ "tower5286", 2 },{ "tower4311", 3 },{ "tower6918", 4 },{ "tower5192", 5 }}) do
+        pcall(function() equip:FireServer(item[1], item[2]) end)
     end
 end, Color3.fromRGB(255,140,0))
 
 createButton(AssistTab, "3天使1恶魔1大师", function()
-    local RS = game:GetService("ReplicatedStorage")
-    local equip = RS:WaitForChild("Modules", 9e9)
-        :WaitForChild("Remotes", 9e9)
-        :WaitForChild("RemoteEvent", 9e9)
-        :WaitForChild("Equip", 9e9)
-    local list = {
-        { "tower6327", 1 },
-        { "tower5646", 2 },
-        { "tower5465", 3 },
-        { "tower5669", 4 },
-        { "tower5191", 5 },
-    }
-    for _, item in ipairs(list) do
-        local ok, err = pcall(function()
-            equip:FireServer(item[1], item[2])
-        end)
-        print("[3天使1恶魔1大师] " .. item[1] .. " 槽" .. item[2] .. " 结果:", ok, err)
+    local equip = game:GetService("ReplicatedStorage"):WaitForChild("Modules", 9e9):WaitForChild("Remotes", 9e9):WaitForChild("RemoteEvent", 9e9):WaitForChild("Equip", 9e9)
+    for _, item in ipairs({{ "tower6327", 1 },{ "tower5646", 2 },{ "tower5465", 3 },{ "tower5669", 4 },{ "tower5191", 5 }}) do
+        pcall(function() equip:FireServer(item[1], item[2]) end)
     end
 end, Color3.fromRGB(186,85,211))
+
+createButton(AssistTab, "怪物泰泰黑死艺伎新手", function()
+    local equip = game:GetService("ReplicatedStorage"):WaitForChild("Modules", 9e9):WaitForChild("Remotes", 9e9):WaitForChild("RemoteEvent", 9e9):WaitForChild("Equip", 9e9)
+    for _, item in ipairs({{ "tower5794", 1 },{ "tower8006", 2 },{ "tower6957", 3 },{ "tower5194", 4 },{ "tower5713", 5 }}) do
+        pcall(function() equip:FireServer(item[1], item[2]) end)
+    end
+end, Color3.fromRGB(255,215,0))
 
 -- ============ 音乐页 ============
 local function getBGM()
@@ -419,85 +410,6 @@ volBox.FocusLost:Connect(function()
     else volBox.Text = tostring(getBGM().Volume) end
 end)
 
-local spFrame = Instance.new("Frame")
-spFrame.Size = UDim2.new(1,0,0,32)
-spFrame.BackgroundColor3 = Color3.fromRGB(45,45,65)
-spFrame.Parent = MusicTab
-Instance.new("UICorner", spFrame).CornerRadius = UDim.new(0,6)
-local sl = Instance.new("UIListLayout", spFrame)
-sl.FillDirection = Enum.FillDirection.Horizontal
-sl.Padding = UDim.new(0,4)
-sl.VerticalAlignment = Enum.VerticalAlignment.Center
-local sLb = Instance.new("TextLabel")
-sLb.Size = UDim2.new(0,50,1,0)
-sLb.BackgroundTransparency = 1
-sLb.Text = "速度"
-sLb.TextColor3 = Color3.new(1,1,1)
-sLb.Font = Enum.Font.GothamSemibold
-sLb.TextSize = 12
-sLb.TextXAlignment = Enum.TextXAlignment.Left
-sLb.Parent = spFrame
-local spBox = Instance.new("TextBox")
-spBox.Size = UDim2.new(1,-55,0,22)
-spBox.BackgroundColor3 = Color3.fromRGB(60,60,85)
-spBox.TextColor3 = Color3.new(1,1,1)
-spBox.Font = Enum.Font.Gotham
-spBox.TextSize = 12
-spBox.ClearTextOnFocus = false
-spBox.Text = tostring(getBGM().PlaybackSpeed)
-spBox.Parent = spFrame
-spBox.FocusLost:Connect(function()
-    local n = tonumber(spBox.Text)
-    if n and n>=0.1 and n<=10 then getBGM().PlaybackSpeed=n; print("[音乐] 速度 →", n)
-    else spBox.Text = tostring(getBGM().PlaybackSpeed) end
-end)
-
-local posFrame = Instance.new("Frame")
-posFrame.Size = UDim2.new(1,0,0,32)
-posFrame.BackgroundColor3 = Color3.fromRGB(45,45,65)
-posFrame.Parent = MusicTab
-Instance.new("UICorner", posFrame).CornerRadius = UDim.new(0,6)
-local pl = Instance.new("UIListLayout", posFrame)
-pl.FillDirection = Enum.FillDirection.Horizontal
-pl.Padding = UDim.new(0,4)
-pl.VerticalAlignment = Enum.VerticalAlignment.Center
-local pLb = Instance.new("TextLabel")
-pLb.Size = UDim2.new(0,50,1,0)
-pLb.BackgroundTransparency = 1
-pLb.Text = "进度"
-pLb.TextColor3 = Color3.new(1,1,1)
-pLb.Font = Enum.Font.GothamSemibold
-pLb.TextSize = 12
-pLb.TextXAlignment = Enum.TextXAlignment.Left
-pLb.Parent = posFrame
-local posBox = Instance.new("TextBox")
-posBox.Size = UDim2.new(1,-55,0,22)
-posBox.BackgroundColor3 = Color3.fromRGB(60,60,85)
-posBox.TextColor3 = Color3.new(1,1,1)
-posBox.Font = Enum.Font.Gotham
-posBox.TextSize = 12
-posBox.ClearTextOnFocus = false
-posBox.Text = string.format("%.2f", getBGM().TimePosition)
-posBox.Parent = posFrame
-posBox.FocusLost:Connect(function()
-    local n = tonumber(posBox.Text)
-    if n and n>=0 then
-        getBGM().TimePosition = n
-        posBox.Text = string.format("%.2f", n)
-        print("[音乐] 进度 →", n)
-    else posBox.Text = string.format("%.2f", getBGM().TimePosition) end
-end)
-
-task.spawn(function()
-    while true do
-        task.wait(0.1)
-        if not posBox.Focused then
-            local b = getBGM()
-            if b then posBox.Text = string.format("%.2f", b.TimePosition) end
-        end
-    end
-end)
-
 local playingToggle = createToggle(MusicTab, "播放", true, function(enabled)
     getBGM().Playing = enabled
     print("[音乐] 播放", enabled and "开启" or "关闭")
@@ -506,23 +418,6 @@ end)
 local loopToggle = createToggle(MusicTab, "循环播放", true, function(enabled)
     getBGM().Looped = enabled
     print("[音乐] 循环", enabled and "开启" or "关闭")
-end)
-
-local fixedVolumeToggle = createToggle(MusicTab, "固定音量", false, function(enabled)
-    print("[音乐] 固定音量", enabled and "开启" or "关闭")
-end)
-
-task.spawn(function()
-    while true do
-        task.wait(0.1)
-        if fixedVolumeToggle:Get() then
-            local vn = tonumber(volBox.Text)
-            if vn and vn>=0 and vn<=10 then
-                local b = getBGM()
-                if b and math.abs(b.Volume - vn) > 0.01 then b.Volume = vn end
-            end
-        end
-    end
 end)
 
 -- 快速选歌
